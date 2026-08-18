@@ -13,7 +13,7 @@ bootstrap:
 	$(VENV_PIP) install --requirement requirements-dev.lock
 
 test:
-	node --test tests/js/*.test.js
+	npm test
 	$(VENV_PYTHON) -m pytest
 
 build:

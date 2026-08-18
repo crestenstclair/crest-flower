@@ -8,6 +8,6 @@
   },
   "packageManager": "npm@10.9.2",
   "scripts": {
-    "test": "node --test tests/js/*.test.js"
+    "test": "node --test --experimental-test-coverage --test-coverage-include=src/core/*.js --test-coverage-branches=100 --test-coverage-functions=100 --test-coverage-lines=100 tests/js/*.test.js"
   }
 }

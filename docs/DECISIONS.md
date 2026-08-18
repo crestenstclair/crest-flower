@@ -83,3 +83,32 @@
   confirmed top-left A8, bottom-left A1, top-right H8, and bottom-right H1. Final Live
   inspection showed `Pad: H1 0` and `Status: matrix acquired` after focus and device
   disable/re-enable cycling.
+
+## 2026-08-17 — WP3 musical semantics
+
+- **Scale input:** Use Live's root-relative `scale_intervals` exactly; interval 0 is
+  degree 1. Scale walks cycle into the next octave, so scales with fewer than seven
+  entries still define seven chord roots and the complete note layout.
+- **Octaves:** Base Octave uses Ableton's displayed octave convention (`C3 = MIDI 60`).
+  H4/degree 8 is always tonic +12 and is not the next item in the scale walk.
+- **Harmony:** Chord quality is chromatic relative to the selected scale-degree root.
+  `7` adds +10, `9` adds +14 without implying 7, and both modifiers preserve that
+  order. Valid pitches above MIDI 127 are omitted rather than wrapped or clamped.
+- **Layout:** A row advances one scale degree per file. Ranks 2 and 3 begin three scale
+  degrees above ranks 1 and 2 respectively, making a diatonic-fourth overlap.
+- **Ownership:** A physical pad snapshots its pitches at note-on. Shared pitches sound
+  only on reference-count transition 0→1 and release only on 1→0. Repeated note-on for
+  one owner first releases that owner's prior snapshot. Output note-ons retain the pad
+  velocity; note-offs use velocity 0.
+- **Panic:** Panic, focus loss, disable, deletion, and Set close emit exact tracked
+  note-offs in ascending pitch order, then CC123 All Notes Off, and clear all state.
+
+## 2026-08-17 — WP3 gate state
+
+- **Automated gate:** Passing. Table-driven golden vectors cover C major, E natural
+  minor, and D Dorian. The Node test runner enforces 100% line, branch, and function
+  coverage across every deterministic core module, including its Max-compatible load
+  path.
+- **Hardware gate:** None. WP3 is deliberately Push-independent; artifact integration
+  remains WP4 and has not begun.
+- **Musical assumptions:** Resolved and recorded above. WP3 is accepted.

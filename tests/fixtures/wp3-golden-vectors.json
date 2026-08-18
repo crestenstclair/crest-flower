@@ -1,0 +1,50 @@
+[
+  {
+    "name": "C major",
+    "rootNote": 0,
+    "intervals": [0, 2, 4, 5, 7, 9, 11],
+    "degreeRoots": [60, 62, 64, 65, 67, 69, 71, 72],
+    "layout": [
+      [60, 62, 64, 65, 67, 69, 71, 72],
+      [65, 67, 69, 71, 72, 74, 76, 77],
+      [71, 72, 74, 76, 77, 79, 81, 83]
+    ],
+    "quality": "major",
+    "seventh": false,
+    "ninth": false,
+    "degree": 1,
+    "chord": [60, 64, 67]
+  },
+  {
+    "name": "E natural minor",
+    "rootNote": 4,
+    "intervals": [0, 2, 3, 5, 7, 8, 10],
+    "degreeRoots": [64, 66, 67, 69, 71, 72, 74, 76],
+    "layout": [
+      [64, 66, 67, 69, 71, 72, 74, 76],
+      [69, 71, 72, 74, 76, 78, 79, 81],
+      [74, 76, 78, 79, 81, 83, 84, 86]
+    ],
+    "quality": "minor",
+    "seventh": false,
+    "ninth": true,
+    "degree": 1,
+    "chord": [64, 67, 71, 78]
+  },
+  {
+    "name": "D Dorian",
+    "rootNote": 2,
+    "intervals": [0, 2, 3, 5, 7, 9, 10],
+    "degreeRoots": [62, 64, 65, 67, 69, 71, 72, 74],
+    "layout": [
+      [62, 64, 65, 67, 69, 71, 72, 74],
+      [67, 69, 71, 72, 74, 76, 77, 79],
+      [72, 74, 76, 77, 79, 81, 83, 84]
+    ],
+    "quality": "sus",
+    "seventh": true,
+    "ninth": true,
+    "degree": 4,
+    "chord": [67, 72, 74, 77, 81]
+  }
+]

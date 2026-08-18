@@ -2,10 +2,10 @@
 
 ## Scope and gate
 
-WP0 and WP1 are accepted. WP2 is the next work package, but do not begin it without a
-new implementation request. Repeated Push Standalone switching is explicitly deferred
-by user decision; preserve standalone compatibility without requiring a standalone
-test at each gate.
+WP0–WP3 are accepted. WP4 is the next work package, but do not begin it without a new
+implementation request. Repeated Push Standalone switching is explicitly deferred by
+user decision; preserve standalone compatibility without requiring a standalone test
+at each gate.
 
 ## Source of truth
 

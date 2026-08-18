@@ -71,6 +71,32 @@ unembedded runtime dependency.
 ## Future runtime boundaries
 
 The implemented runtime boundary now includes Push discovery/grid ownership, focus
-management, and coordinate normalization. Live scale observation, deterministic
-harmony/state, active-note ownership, and generated MIDI remain future work. Runtime
+management, coordinate normalization, and the WP3 deterministic musical engine. Live
+scale observation, grid-to-engine wiring, and generated MIDI remain WP4 work. Runtime
 dependencies remain limited to native Max, Max `js`, and the public Live Object Model.
+
+## WP3 deterministic core
+
+The pure ES5-compatible core has four boundaries:
+
+```text
+Live scale snapshot ─▶ harmony/state ─▶ chord or single-note pitch snapshot
+                                             │
+physical pad owner + velocity ───────────────▼
+                                      active-note manager ─▶ plain MIDI events
+                                             ▲
+focus loss / disable / delete / Set close ───┘
+```
+
+`harmony.js` treats `scale_intervals` as root-relative, strictly increasing values
+whose first degree is `0`, matching the Live Object Model. Scale positions advance
+cyclically for layouts and short scales, while degree 8 is special-cased to tonic +12.
+Base Octave follows Live's note labels, so C3 is MIDI 60.
+
+`state.js` owns only future-trigger state: one of four qualities and independent 7/add9
+toggles. A held pad's pitch array is copied into `active-notes.js`; later quality or
+scale changes therefore cannot change its release. Each pitch is emitted on the first
+owner transition from zero to one and released on the last transition from one to zero.
+A repeated press from the same owner releases its old snapshot before taking the new
+one. All loss-of-ownership lifecycle events emit the exact remaining note-offs in
+ascending pitch order, then CC123 All Notes Off, and clear all ownership state.

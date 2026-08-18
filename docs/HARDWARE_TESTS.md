@@ -129,3 +129,20 @@ switch or transfer.
 `[x] WP2 accepted — WP3 may begin when requested`
 
 `[ ] WP2 rejected — return evidence to the agent; do not edit the patch`
+
+## WP3 automated-only acceptance
+
+WP3 does not change the WP2 artifact and requires no Push action. Its exact golden
+results are:
+
+| Scale (Base Octave 3) | Degree roots A4–H4 | Note rows A1–H3 |
+| --- | --- | --- |
+| C major | `60 62 64 65 67 69 71 72` | `60 62 64 65 67 69 71 72` / `65 67 69 71 72 74 76 77` / `71 72 74 76 77 79 81 83` |
+| E natural minor | `64 66 67 69 71 72 74 76` | `64 66 67 69 71 72 74 76` / `69 71 72 74 76 78 79 81` / `74 76 78 79 81 83 84 86` |
+| D Dorian | `62 64 65 67 69 71 72 74` | `62 64 65 67 69 71 72 74` / `67 69 71 72 74 76 77 79` / `72 74 76 77 79 81 83 84` |
+
+Automated lifecycle vectors additionally require exact held-pad release snapshots,
+shared-pitch 0→1/1→0 transitions, velocity preservation, retrigger replacement, and
+exact panic note-offs followed by CC123.
+
+`[x] WP3 accepted — automated musical gate complete; WP4 requires a new request`
