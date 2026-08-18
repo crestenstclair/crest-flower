@@ -1,6 +1,6 @@
 """Project-owned Max object policy shared by generators and validators."""
 
-WP2_ALLOWED_NEWOBJS = frozenset(
+WP4_ALLOWED_NEWOBJS = frozenset(
     {
         "append",
         "deferlow",
@@ -10,21 +10,40 @@ WP2_ALLOWED_NEWOBJS = frozenset(
         "live.observer",
         "live.path",
         "live.thisdevice",
+        "midiformat",
         "midiin",
         "midiout",
+        "midiparse",
         "p",
         "prepend",
         "route",
-        "s",
         "sel",
         "t",
         "zl",
     }
 )
-WP2_ALLOWED_MAXCLASSES = frozenset(
-    {"inlet", "live.comment", "live.dial", "message", "newobj", "outlet", "panel"}
+WP4_ALLOWED_MAXCLASSES = frozenset(
+    {
+        "inlet",
+        "live.comment",
+        "live.dial",
+        "message",
+        "newobj",
+        "outlet",
+        "panel",
+        "textbutton",
+    }
 )
-WP2_EMBEDDED_RUNTIME_FILES = frozenset({"push-grid-adapter.js"})
+WP4_EMBEDDED_RUNTIME_FILES = frozenset(
+    {
+        "active-notes.js",
+        "harmony.js",
+        "live-scale-adapter.js",
+        "push-grid-adapter.js",
+        "runtime-adapter.js",
+        "state.js",
+    }
+)
 
 FORBIDDEN_OBJECTS = frozenset(
     {

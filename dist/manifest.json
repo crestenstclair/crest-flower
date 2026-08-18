@@ -1,12 +1,17 @@
 {
   "artifact": {
-    "bytes": 39508,
+    "bytes": 85704,
     "path": "PushChordGrid.amxd",
-    "sha256": "fc4a1cad98cb17687c65223994eb3d8e1c8c9f030f551687d16cad2a4a76ed7d",
+    "sha256": "b276cc22c4882d130e54385cba67d45bf3b3ac1d0fd7d8e17094d0ffee57b549",
     "type_code": "mmmm"
   },
   "embedded_runtime_files": [
-    "push-grid-adapter.js"
+    "active-notes.js",
+    "harmony.js",
+    "live-scale-adapter.js",
+    "push-grid-adapter.js",
+    "runtime-adapter.js",
+    "state.js"
   ],
   "generator": {
     "commit": "6c602b2861bf628d14fd39854d984b12de3cebff",
@@ -16,9 +21,9 @@
   "project": "push-chord-grid",
   "runtime_dependencies": [],
   "schema_version": 1,
-  "stage": "WP2",
+  "stage": "WP4",
   "stored_parameters": [
     "Base Octave"
   ],
-  "version": "0.2.0"
+  "version": "0.4.5"
 }

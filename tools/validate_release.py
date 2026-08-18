@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate a WP2 artifact and its deterministic manifest."""
+"""Validate a WP4 artifact and its deterministic manifest."""
 
 from __future__ import annotations
 
@@ -15,8 +15,8 @@ try:
 except ImportError:  # Direct script execution.
     from inspect_amxd import AmxdValidationError, summary, validate_amxd
 
-PROJECT_VERSION = "0.2.0"
-BUILD_STAGE = "WP2"
+PROJECT_VERSION = "0.4.5"
+BUILD_STAGE = "WP4"
 GENERATOR_NAME = "m4l-builder"
 GENERATOR_VERSION = "0.8.0"
 GENERATOR_COMMIT = "6c602b2861bf628d14fd39854d984b12de3cebff"

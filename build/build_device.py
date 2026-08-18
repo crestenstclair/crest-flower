@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the self-contained WP2 Push Chord Grid Max for Live MIDI Effect."""
+"""Generate the self-contained WP4 Push Chord Grid Max for Live MIDI Effect."""
 
 from __future__ import annotations
 
@@ -18,8 +18,23 @@ DEVICE_NAME = "Push Chord Grid"
 DEFAULT_OUTPUT = Path("dist/PushChordGrid.amxd")
 REPRODUCIBLE_TIMESTAMP = 946684800
 ROOT = Path(__file__).resolve().parents[1]
-PUSH_ADAPTER_NAME = "push-grid-adapter.js"
-PUSH_ADAPTER_SOURCE = ROOT / "src" / "max" / PUSH_ADAPTER_NAME
+RUNTIME_FILES = (
+    "active-notes.js",
+    "harmony.js",
+    "live-scale-adapter.js",
+    "push-grid-adapter.js",
+    "runtime-adapter.js",
+    "state.js",
+)
+
+
+def _runtime_source(filename: str) -> Path:
+    directory = (
+        "core"
+        if filename in {"active-notes.js", "harmony.js", "state.js"}
+        else "max"
+    )
+    return ROOT / "src" / directory / filename
 
 
 def _port(box_id: str, maxclass: str, x: int) -> dict:
@@ -40,6 +55,7 @@ def create_push_native_adapter() -> Subpatcher:
     patch = Subpatcher("push-native-adapter")
     patch.add_box(_port("discover-in", "inlet", 20))
     patch.add_box(_port("ownership-in", "inlet", 620))
+    patch.add_box(_port("led-in", "inlet", 870))
     patch.add_box(_port("events-out", "outlet", 360))
 
     for box_id, text, x, y in (
@@ -76,6 +92,9 @@ def create_push_native_adapter() -> Subpatcher:
         ("matrix-value-event", "prepend matrix_event", 1, 1, 500, 380),
         ("ownership-select", "sel 1 0", 3, 3, 620, 340),
         ("defer-grab", "deferlow", 1, 1, 620, 380),
+        ("matrix-object", "live.object", 2, 1, 870, 420),
+        ("prepend-led-command", "prepend send_value", 1, 1, 870, 460),
+        ("prepend-led-call", "prepend call", 1, 1, 870, 500),
     ):
         patch.add_newobj(
             box_id,
@@ -115,6 +134,7 @@ def create_push_native_adapter() -> Subpatcher:
         ("get-button-matrix", 0, "surface-object", 0),
         ("surface-result-router", 1, "matrix-trigger", 0),
         ("matrix-trigger", 2, "matrix-command-argument", 0),
+        ("matrix-trigger", 2, "matrix-object", 1),
         ("matrix-command-argument", 0, "matrix-command", 0),
         ("matrix-trigger", 1, "matrix-observer", 0),
         ("matrix-trigger", 0, "matrix-event", 0),
@@ -130,6 +150,9 @@ def create_push_native_adapter() -> Subpatcher:
         ("ownership-select", 1, "release-matrix", 0),
         ("release-matrix", 0, "matrix-command", 0),
         ("matrix-command", 0, "surface-object", 0),
+        ("led-in", 0, "prepend-led-command", 0),
+        ("prepend-led-command", 0, "prepend-led-call", 0),
+        ("prepend-led-call", 0, "matrix-object", 0),
     )
     for source, outlet, destination, inlet in edges:
         patch.add_line(source, outlet, destination, inlet)
@@ -137,11 +160,11 @@ def create_push_native_adapter() -> Subpatcher:
 
 
 def create_device() -> MidiEffect:
-    """Return the complete WP2 device graph."""
-    device = MidiEffect(DEVICE_NAME, width=300, height=88)
+    """Return the complete WP4 device graph."""
+    device = MidiEffect(DEVICE_NAME, width=440, height=112)
     device.add_panel(
         "background",
-        [0, 0, 300, 88],
+        [0, 0, 440, 112],
         bgcolor=[0.10, 0.11, 0.13, 1.0],
         border=0,
     )
@@ -155,7 +178,7 @@ def create_device() -> MidiEffect:
         steps=9,
         unitstyle=0,
         annotation_name="Base Octave",
-        info="Stored base octave retained for the future musical engine.",
+        info="Lowest chord-row octave; ranks 2-4 add one octave each (C3 = MIDI 60).",
     )
     device.assign_parameter_bank(
         base_octave,
@@ -163,29 +186,57 @@ def create_device() -> MidiEffect:
         position=0,
         bank_name="Push Chord Grid",
     )
-    device.add_newobj(
-        "base-octave-store",
-        "s ---pcg-base-octave",
-        numinlets=1,
-        numoutlets=0,
-    )
-    device.add_line(base_octave, 0, "base-octave-store", 0)
     device.add_dsp(*midi_thru("thru"))
 
-    adapter_source = PUSH_ADAPTER_SOURCE.read_text(encoding="utf-8")
-    device.add_support_file(PUSH_ADAPTER_NAME, adapter_source)
+    for filename in RUNTIME_FILES:
+        device.add_support_file(filename, _runtime_source(filename).read_text(encoding="utf-8"))
     device.add_newobj(
         "push-grid-adapter",
-        f"js {PUSH_ADAPTER_NAME}",
+        "js push-grid-adapter.js",
         numinlets=1,
-        numoutlets=3,
+        numoutlets=5,
         patching_rect=[350, 170, 156, 22],
+    )
+    device.add_newobj(
+        "runtime-adapter",
+        "js runtime-adapter.js",
+        numinlets=1,
+        numoutlets=4,
+        patching_rect=[350, 300, 156, 22],
+    )
+    device.add_newobj(
+        "live-scale-adapter",
+        "js live-scale-adapter.js",
+        numinlets=1,
+        numoutlets=1,
+        patching_rect=[520, 110, 175, 22],
+    )
+    device.add_newobj(
+        "generated-midi-format",
+        "midiformat 1",
+        numinlets=7,
+        numoutlets=2,
+        patching_rect=[350, 350, 78, 22],
+    )
+    device.add_newobj(
+        "push-midi-parse",
+        "midiparse",
+        numinlets=1,
+        numoutlets=8,
+        patching_rect=[790, 110, 68, 22],
+    )
+    device.add_newobj(
+        "prepend-pad-velocity",
+        "prepend pad_velocity",
+        numinlets=1,
+        numoutlets=1,
+        patching_rect=[790, 140, 133, 22],
     )
     device.add_subpatcher(
         create_push_native_adapter(),
         "push-native-adapter",
         [620, 170, 150, 22],
-        numinlets=2,
+        numinlets=3,
         numoutlets=1,
     )
     device.add_newobj(
@@ -225,6 +276,46 @@ def create_device() -> MidiEffect:
         patching_rect=[480, 100, 54, 22],
     )
     device.add_newobj(
+        "enabled-select",
+        "sel 1",
+        numinlets=1,
+        numoutlets=2,
+        patching_rect=[610, 60, 45, 22],
+    )
+    device.add_newobj(
+        "defer-grid-discovery",
+        "deferlow",
+        numinlets=1,
+        numoutlets=1,
+        patching_rect=[610, 100, 54, 22],
+    )
+    device.add_textbutton(
+        "reload-grid-button",
+        [12, 80, 78, 22],
+        "Reload Grid",
+        mode=0,
+        fontsize=10.0,
+        bgcolor=[0.18, 0.20, 0.24, 1.0],
+        bgoncolor=[0.20, 0.55, 0.95, 1.0],
+        textcolor=[0.90, 0.92, 0.96, 1.0],
+        patching_rect=[700, 20, 78, 22],
+        hint="Release, rediscover, and reacquire the Push grid.",
+    )
+    device.add_newobj(
+        "reload-trigger",
+        "t b b",
+        numinlets=1,
+        numoutlets=2,
+        patching_rect=[700, 60, 45, 22],
+    )
+    device.add_newobj(
+        "prepend-reload",
+        "prepend reload",
+        numinlets=1,
+        numoutlets=1,
+        patching_rect=[700, 100, 94, 22],
+    )
+    device.add_newobj(
         "prepend-pad-set",
         "prepend set",
         numinlets=1,
@@ -238,35 +329,79 @@ def create_device() -> MidiEffect:
         numoutlets=1,
         patching_rect=[480, 215, 72, 22],
     )
+    device.add_newobj(
+        "prepend-selection-set",
+        "prepend set",
+        numinlets=1,
+        numoutlets=1,
+        patching_rect=[520, 350, 72, 22],
+    )
+    device.add_newobj(
+        "prepend-base-octave",
+        "prepend base_octave",
+        numinlets=1,
+        numoutlets=1,
+        patching_rect=[120, 120, 132, 22],
+    )
     device.add_comment(
         "last-pad-display",
-        [105, 12, 183, 22],
+        [105, 8, 323, 22],
         "Pad: --",
         presentation=1,
-        presentation_rect=[105, 12, 183, 22],
+        presentation_rect=[105, 8, 323, 22],
         textcolor=[0.85, 0.88, 0.92, 1.0],
     )
     device.add_comment(
         "matrix-status-display",
-        [105, 44, 183, 22],
+        [105, 38, 323, 22],
         "Status: waiting for Live",
         presentation=1,
-        presentation_rect=[105, 44, 183, 22],
+        presentation_rect=[105, 38, 323, 22],
         textcolor=[0.85, 0.88, 0.92, 1.0],
     )
+    device.add_comment(
+        "selection-display",
+        [105, 68, 323, 22],
+        "Chord: Auto | Voice 0 | Bass off | Ext -",
+        presentation=1,
+        presentation_rect=[105, 68, 323, 22],
+        textcolor=[0.85, 0.88, 0.92, 1.0],
+    )
+    device.add_line(base_octave, 0, "prepend-base-octave", 0)
+    device.add_line("prepend-base-octave", 0, "runtime-adapter", 0)
     device.add_line("device-lifecycle", 0, "prepend-initialized", 0)
     device.add_line("prepend-initialized", 0, "defer-initialized", 0)
     device.add_line("defer-initialized", 0, "push-grid-adapter", 0)
+    device.add_line("defer-initialized", 0, "live-scale-adapter", 0)
     device.add_line("device-lifecycle", 0, "push-native-adapter", 0)
     device.add_line("device-lifecycle", 1, "prepend-enabled", 0)
+    device.add_line("device-lifecycle", 1, "enabled-select", 0)
     device.add_line("prepend-enabled", 0, "defer-enabled", 0)
     device.add_line("defer-enabled", 0, "push-grid-adapter", 0)
+    device.add_line("enabled-select", 0, "defer-grid-discovery", 0)
+    device.add_line("reload-grid-button", 0, "reload-trigger", 0)
+    device.add_line("reload-trigger", 1, "prepend-reload", 0)
+    device.add_line("prepend-reload", 0, "push-grid-adapter", 0)
+    device.add_line("reload-trigger", 0, "defer-grid-discovery", 0)
+    device.add_line("defer-grid-discovery", 0, "push-native-adapter", 0)
     device.add_line("push-grid-adapter", 0, "prepend-pad-set", 0)
     device.add_line("prepend-pad-set", 0, "last-pad-display", 0)
     device.add_line("push-grid-adapter", 1, "prepend-status-set", 0)
     device.add_line("prepend-status-set", 0, "matrix-status-display", 0)
     device.add_line("push-grid-adapter", 2, "push-native-adapter", 1)
+    device.add_line("push-grid-adapter", 3, "runtime-adapter", 0)
+    device.add_line("push-grid-adapter", 4, "runtime-adapter", 0)
     device.add_line("push-native-adapter", 0, "push-grid-adapter", 0)
+    device.add_line("thru_midiin", 0, "push-midi-parse", 0)
+    device.add_line("push-midi-parse", 0, "prepend-pad-velocity", 0)
+    device.add_line("prepend-pad-velocity", 0, "push-grid-adapter", 0)
+    device.add_line("live-scale-adapter", 0, "runtime-adapter", 0)
+    device.add_line("runtime-adapter", 0, "generated-midi-format", 0)
+    device.add_line("runtime-adapter", 1, "generated-midi-format", 2)
+    device.add_line("generated-midi-format", 0, "thru_midiout", 0)
+    device.add_line("runtime-adapter", 2, "prepend-selection-set", 0)
+    device.add_line("runtime-adapter", 3, "push-native-adapter", 2)
+    device.add_line("prepend-selection-set", 0, "selection-display", 0)
     return device
 
 

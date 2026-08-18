@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Parse and statically validate the generated WP2 AMXD artifact."""
+"""Parse and statically validate the generated WP4 AMXD artifact."""
 
 from __future__ import annotations
 
@@ -22,9 +22,9 @@ from m4l_builder.freeze import extract_frozen_amxd  # noqa: E402
 from build.max_objects import (  # noqa: E402
     FORBIDDEN_OBJECTS,
     FORBIDDEN_PREFIXES,
-    WP2_ALLOWED_MAXCLASSES,
-    WP2_ALLOWED_NEWOBJS,
-    WP2_EMBEDDED_RUNTIME_FILES,
+    WP4_ALLOWED_MAXCLASSES,
+    WP4_ALLOWED_NEWOBJS,
+    WP4_EMBEDDED_RUNTIME_FILES,
 )
 
 AMXD_MAGIC = b"ampf"
@@ -134,7 +134,7 @@ def _root_patcher(document: AmxdDocument) -> dict[str, Any]:
 
 
 def validate_document(document: AmxdDocument) -> list[str]:
-    """Return all WP2 policy violations for a parsed document."""
+    """Return all WP4 policy violations for a parsed document."""
     errors: list[str] = []
     if document.version != AMXD_VERSION:
         errors.append(f"container version is {document.version}, expected {AMXD_VERSION}")
@@ -144,7 +144,7 @@ def validate_document(document: AmxdDocument) -> list[str]:
         struct.unpack("<I", document.metadata)[0] if len(document.metadata) == 4 else None
     )
     if frozen_marker != 7:
-        errors.append("WP2 artifact is not frozen/self-contained")
+        errors.append("WP4 artifact is not frozen/self-contained")
 
     try:
         patcher = _root_patcher(document)
@@ -153,9 +153,7 @@ def validate_document(document: AmxdDocument) -> list[str]:
 
     project_type = patcher.get("project", {}).get("amxdtype")
     if project_type != MIDI_EFFECT_PROJECT_TYPE:
-        errors.append(
-            f"project amxdtype is {project_type!r}, expected {MIDI_EFFECT_PROJECT_TYPE}"
-        )
+        errors.append(f"project amxdtype is {project_type!r}, expected {MIDI_EFFECT_PROJECT_TYPE}")
 
     boxes = list(iter_boxes(document.patcher))
     root_boxes = [entry.get("box", {}) for entry in patcher.get("boxes", [])]
@@ -170,10 +168,10 @@ def validate_document(document: AmxdDocument) -> list[str]:
             name.startswith(prefix) for prefix in FORBIDDEN_PREFIXES
         ):
             errors.append(f"forbidden runtime object: {name}")
-        if maxclass not in WP2_ALLOWED_MAXCLASSES:
-            errors.append(f"undeclared WP2 maxclass: {maxclass}")
-        if maxclass == "newobj" and name not in WP2_ALLOWED_NEWOBJS:
-            errors.append(f"undeclared WP2 newobj: {name}")
+        if maxclass not in WP4_ALLOWED_MAXCLASSES:
+            errors.append(f"undeclared WP4 maxclass: {maxclass}")
+        if maxclass == "newobj" and name not in WP4_ALLOWED_NEWOBJS:
+            errors.append(f"undeclared WP4 newobj: {name}")
 
     dependencies = patcher.get("dependency_cache", [])
     declared_dependencies = {
@@ -182,14 +180,14 @@ def validate_document(document: AmxdDocument) -> list[str]:
     embedded_dependencies = {
         name for name in document.embedded_files if not name.lower().endswith(".amxd")
     }
-    if declared_dependencies != WP2_EMBEDDED_RUNTIME_FILES:
+    if declared_dependencies != WP4_EMBEDDED_RUNTIME_FILES:
         errors.append(
-            "WP2 dependency cache does not exactly declare the matrix adapter: "
+            "WP4 dependency cache does not exactly declare the integrated runtime: "
             f"{sorted(declared_dependencies)}"
         )
-    if embedded_dependencies != WP2_EMBEDDED_RUNTIME_FILES:
+    if embedded_dependencies != WP4_EMBEDDED_RUNTIME_FILES:
         errors.append(
-            "WP2 frozen payload does not exactly embed the matrix adapter: "
+            "WP4 frozen payload does not exactly embed the integrated runtime: "
             f"{sorted(embedded_dependencies)}"
         )
     external_dependencies = declared_dependencies - embedded_dependencies
@@ -201,26 +199,32 @@ def validate_document(document: AmxdDocument) -> list[str]:
         if box.get("maxclass") == "newobj":
             ids_by_text.setdefault(str(box.get("text", "")), []).append(str(box.get("id")))
     actual_newobjs = Counter(
-        str(box.get("text", ""))
-        for box in root_boxes
-        if box.get("maxclass") == "newobj"
+        str(box.get("text", "")) for box in root_boxes if box.get("maxclass") == "newobj"
     )
     expected_newobjs = Counter(
         {
-            "deferlow": 2,
+            "deferlow": 3,
+            "js live-scale-adapter.js": 1,
             "js push-grid-adapter.js": 1,
+            "js runtime-adapter.js": 1,
             "live.thisdevice": 1,
+            "midiformat 1": 1,
             "midiin": 1,
             "midiout": 1,
+            "midiparse": 1,
             "p push-native-adapter": 1,
+            "prepend base_octave": 1,
             "prepend enabled": 1,
             "prepend initialized": 1,
-            "prepend set": 2,
-            "s ---pcg-base-octave": 1,
+            "prepend pad_velocity": 1,
+            "prepend reload": 1,
+            "prepend set": 3,
+            "sel 1": 1,
+            "t b b": 1,
         }
     )
     if actual_newobjs != expected_newobjs:
-        errors.append(f"unexpected WP2 newobj graph: {dict(sorted(actual_newobjs.items()))}")
+        errors.append(f"unexpected WP4 newobj graph: {dict(sorted(actual_newobjs.items()))}")
 
     lines = [entry.get("patchline", {}) for entry in patcher.get("lines", [])]
     for line in lines:
@@ -230,6 +234,7 @@ def validate_document(document: AmxdDocument) -> list[str]:
             errors.append(f"patchline has unknown source: {source!r}")
         if destination not in root_ids:
             errors.append(f"patchline has unknown destination: {destination!r}")
+
     def one_id(text: str) -> str | None:
         matches = ids_by_text.get(text, [])
         return matches[0] if len(matches) == 1 else None
@@ -244,32 +249,53 @@ def validate_document(document: AmxdDocument) -> list[str]:
     )
     expected_parameter_line = {
         "source": [parameter_id, 0],
-        "destination": [one_id("s ---pcg-base-octave"), 0],
+        "destination": [one_id("prepend base_octave"), 0],
     }
     normalized_lines = [
-        {"source": line.get("source"), "destination": line.get("destination")}
-        for line in lines
+        {"source": line.get("source"), "destination": line.get("destination")} for line in lines
     ]
     if (
         expected_parameter_line not in normalized_lines
         or expected_midi_line not in normalized_lines
     ):
-        errors.append("WP2 graph does not preserve the parameter sink and raw MIDI passthrough")
+        errors.append("WP4 graph does not preserve parameter input and raw MIDI passthrough")
 
     required_edges = {
         ("device-lifecycle", 0, "prepend-initialized", 0),
         ("prepend-initialized", 0, "defer-initialized", 0),
         ("defer-initialized", 0, "push-grid-adapter", 0),
+        ("defer-initialized", 0, "live-scale-adapter", 0),
         ("device-lifecycle", 0, "push-native-adapter", 0),
         ("device-lifecycle", 1, "prepend-enabled", 0),
+        ("device-lifecycle", 1, "enabled-select", 0),
         ("prepend-enabled", 0, "defer-enabled", 0),
         ("defer-enabled", 0, "push-grid-adapter", 0),
+        ("enabled-select", 0, "defer-grid-discovery", 0),
+        ("reload-grid-button", 0, "reload-trigger", 0),
+        ("reload-trigger", 1, "prepend-reload", 0),
+        ("prepend-reload", 0, "push-grid-adapter", 0),
+        ("reload-trigger", 0, "defer-grid-discovery", 0),
+        ("defer-grid-discovery", 0, "push-native-adapter", 0),
         ("push-grid-adapter", 0, "prepend-pad-set", 0),
         ("prepend-pad-set", 0, "last-pad-display", 0),
         ("push-grid-adapter", 1, "prepend-status-set", 0),
         ("prepend-status-set", 0, "matrix-status-display", 0),
         ("push-grid-adapter", 2, "push-native-adapter", 1),
+        ("push-grid-adapter", 3, "runtime-adapter", 0),
+        ("push-grid-adapter", 4, "runtime-adapter", 0),
         ("push-native-adapter", 0, "push-grid-adapter", 0),
+        ("thru_midiin", 0, "push-midi-parse", 0),
+        ("push-midi-parse", 0, "prepend-pad-velocity", 0),
+        ("prepend-pad-velocity", 0, "push-grid-adapter", 0),
+        ("live-scale-adapter", 0, "runtime-adapter", 0),
+        ("runtime-adapter", 0, "generated-midi-format", 0),
+        ("runtime-adapter", 1, "generated-midi-format", 2),
+        ("generated-midi-format", 0, "thru_midiout", 0),
+        ("runtime-adapter", 2, "prepend-selection-set", 0),
+        ("runtime-adapter", 3, "push-native-adapter", 2),
+        ("prepend-selection-set", 0, "selection-display", 0),
+        ("base-octave", 0, "prepend-base-octave", 0),
+        ("prepend-base-octave", 0, "runtime-adapter", 0),
     }
     actual_edges = {
         (
@@ -281,9 +307,17 @@ def validate_document(document: AmxdDocument) -> list[str]:
         for line in lines
     }
     if not required_edges.issubset(actual_edges):
-        errors.append("WP2 lifecycle/status graph is incomplete")
-    if len(lines) != 15:
-        errors.append(f"WP2 root graph has {len(lines)} patchlines, expected 15")
+        errors.append("WP4 scale/grid/MIDI/lifecycle graph is incomplete")
+    if len(lines) != 36:
+        errors.append(f"WP4 root graph has {len(lines)} patchlines, expected 36")
+
+    reload_buttons = [
+        box
+        for box in root_boxes
+        if box.get("id") == "reload-grid-button" and box.get("maxclass") == "textbutton"
+    ]
+    if len(reload_buttons) != 1 or reload_buttons[0].get("text") != "Reload Grid":
+        errors.append("WP4 device does not expose exactly one Reload Grid button")
 
     comments = {
         str(box.get("id")): str(box.get("text"))
@@ -293,9 +327,10 @@ def validate_document(document: AmxdDocument) -> list[str]:
     expected_comments = {
         "last-pad-display": "Pad: --",
         "matrix-status-display": "Status: waiting for Live",
+        "selection-display": "Chord: Auto | Voice 0 | Bass off | Ext -",
     }
     if comments != expected_comments:
-        errors.append(f"WP2 status displays are unexpected: {comments!r}")
+        errors.append(f"WP4 status displays are unexpected: {comments!r}")
 
     parameters = [box for box in boxes if box.get("parameter_enable") == 1]
     if len(parameters) != 1:
@@ -371,7 +406,7 @@ def main() -> int:
     if args.as_json:
         print(json.dumps(result, indent=2, sort_keys=True))
     else:
-        print(f"valid WP2 AMXD: {args.artifact}")
+        print(f"valid WP4 AMXD: {args.artifact}")
     return 0
 
 

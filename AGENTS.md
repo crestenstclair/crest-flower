@@ -2,10 +2,12 @@
 
 ## Scope and gate
 
-WP0–WP3 are accepted. WP4 is the next work package, but do not begin it without a new
-implementation request. Repeated Push Standalone switching is explicitly deferred by
-user decision; preserve standalone compatibility without requiring a standalone test
-at each gate.
+WP0–WP4 are accepted. Version 0.4.1 added Push pad lighting, 0.4.2 changed ranks 1–4
+to four octave-spaced automatically diatonic chord rows, and the current authorized
+0.4.3 follow-up adapts Orchid's harmonic modifiers, chord voicing, and bass. Do not
+begin WP5 without a new implementation request. Repeated Push
+Standalone switching is explicitly deferred by user decision; preserve standalone
+compatibility without requiring a standalone test at each gate.
 
 ## Source of truth
 
@@ -32,6 +34,28 @@ make package
 Run `make test`, `make build`, and `make validate` after every source change. A
 behavior change must update automated tests and the exact expected results in the
 hardware test card.
+
+## MCP-first Live workflow
+
+Do not ask the user to perform a Live-side action until connected MCP capabilities
+have been checked and exhausted.
+
+1. Connect Producer Pal before other Live operations. Prefer it for Set/track/device
+   reads and writes, scale changes, routing, arming, selection, playback, and recorded
+   MIDI inspection.
+2. Use the Computer Use skill for UI-only gaps such as installing/loading a local AMXD,
+   device-activator interaction, dialogs, visible status inspection, saving a test Set,
+   and screenshots. Use its required `node_repl` workflow.
+3. Use repository commands for generation, validation, checksums, and packaging.
+4. Request user action only for a verified physical-only boundary, such as touching a
+   Push pad when no connected MCP can originate its `Button_Matrix` callback.
+
+The agent owns test setup and evidence capture. Never delegate artifact installation,
+track creation/routing, stock-instrument setup, arming/recording, scale changes, focus
+cycling, device toggling, Set saving, clip inspection, or screenshot/log collection if
+Producer Pal or Computer Use can perform it. At hardware gates, complete and record
+all MCP-addressable checks first, then reduce any remaining human action to the
+smallest physical contact sequence.
 
 ## Runtime constraints
 

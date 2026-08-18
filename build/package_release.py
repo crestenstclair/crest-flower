@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Create a deterministic ready-to-test WP2 zip bundle."""
+"""Create a deterministic ready-to-test WP4 zip bundle."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ if str(ROOT / "tools") not in sys.path:
 
 from validate_release import validate_release  # noqa: E402
 
-ARCHIVE_ROOT = "PushChordGrid-WP2"
+ARCHIVE_ROOT = "PushChordGrid-WP4"
 FIXED_ZIP_TIME = (1980, 1, 1, 0, 0, 0)
 
 
@@ -32,6 +32,8 @@ def package_release(artifact: Path, manifest: Path, output: Path) -> Path:
         (artifact.name, artifact.read_bytes()),
         ("manifest.json", manifest.read_bytes()),
         ("HARDWARE_TESTS.md", (ROOT / "docs/HARDWARE_TESTS.md").read_bytes()),
+        ("ORCHID_ADAPTATION.md", (ROOT / "docs/ORCHID_ADAPTATION.md").read_bytes()),
+        ("USAGE_GUIDE.html", (ROOT / "docs/USAGE_GUIDE.html").read_bytes()),
         ("README.md", (ROOT / "README.md").read_bytes()),
     ]
     output.parent.mkdir(parents=True, exist_ok=True)

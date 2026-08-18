@@ -6,14 +6,24 @@ from build.build_device import build_device
 from tools.inspect_amxd import read_amxd, validate_document
 
 
-def test_only_embedded_matrix_adapter_is_declared(tmp_path: Path) -> None:
+def test_only_integrated_runtime_files_are_declared_and_embedded(tmp_path: Path) -> None:
     document = read_amxd(build_device(tmp_path / "device.amxd"))
-    assert document.patcher["patcher"]["dependency_cache"] == [
-        {"name": "push-grid-adapter.js", "type": "TEXT", "implicit": 1}
+    assert sorted(entry["name"] for entry in document.patcher["patcher"]["dependency_cache"]) == [
+        "active-notes.js",
+        "harmony.js",
+        "live-scale-adapter.js",
+        "push-grid-adapter.js",
+        "runtime-adapter.js",
+        "state.js",
     ]
     assert sorted(document.embedded_files) == [
         "Push Chord Grid.amxd",
+        "active-notes.js",
+        "harmony.js",
+        "live-scale-adapter.js",
         "push-grid-adapter.js",
+        "runtime-adapter.js",
+        "state.js",
     ]
     assert validate_document(document) == []
 
@@ -34,18 +44,16 @@ def test_forbidden_object_is_rejected(tmp_path: Path) -> None:
 
     errors = validate_document(document)
     assert "forbidden runtime object: node.script" in errors
-    assert "undeclared WP2 newobj: node.script" in errors
+    assert "undeclared WP4 newobj: node.script" in errors
 
 
 def test_declared_external_dependency_is_rejected(tmp_path: Path) -> None:
     document = read_amxd(build_device(tmp_path / "device.amxd"))
-    document.patcher["patcher"]["dependency_cache"].append(
-        {"name": "external.mxo", "type": "iLaX"}
-    )
+    document.patcher["patcher"]["dependency_cache"].append({"name": "external.mxo", "type": "iLaX"})
 
     errors = validate_document(document)
     assert any(
-        error.startswith("WP2 dependency cache does not exactly declare") for error in errors
+        error.startswith("WP4 dependency cache does not exactly declare") for error in errors
     )
     assert "unembedded runtime dependencies: ['external.mxo']" in errors
 

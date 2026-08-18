@@ -112,3 +112,159 @@
 - **Hardware gate:** None. WP3 is deliberately Push-independent; artifact integration
   remains WP4 and has not begun.
 - **Musical assumptions:** Resolved and recorded above. WP3 is accepted.
+
+## 2026-08-17 — WP4 integration boundary
+
+- **Routing:** One deterministic runtime adapter owns the 64-coordinate contract and
+  is the only path from normalized matrix events to the WP3 engine.
+- **Silent pads:** The six latching controls and all 26 reserved pads are consumed
+  before active-note ownership, so they cannot emit a musical trigger.
+- **Scale:** A dedicated Max `js` adapter observes all four specified Live Set
+  properties. Root and intervals update future triggers; held owners retain snapshots.
+- **MIDI:** Native `midiformat` produces note bytes from pitch/velocity lists and CC
+  bytes from lifecycle CC123. These merge with the existing raw MIDI passthrough at the
+  device `midiout`.
+- **Lifecycle order:** Focus loss and disable flush the engine before matrix release;
+  `notifydeleted` flushes before teardown release.
+- **Recording route:** The hardware card uses a second MIDI track fed from the device
+  track's Post FX output, allowing exact inspection of generated pitches without
+  requiring a runtime monitor dependency.
+
+## 2026-08-17 — WP4 gate state
+
+- **Automated gate:** Passing. Tests
+  cover all coordinate roles, silent control/reserved behavior, golden MIDI vectors,
+  scale observation normalization, overlap/reference counts, lifecycle flushes,
+  artifact structure, embedded dependencies, and reproducible packaging.
+- **Hardware gate:** Accepted on 2026-08-17. MCP preflight passed in Live 12.4.3. The
+  agent installed and loaded the WP4 artifact, configured and armed a Post-FX Drift recording track,
+  exercised C Major/E Minor/C Major observation, focus reacquisition, and device
+  disable/re-enable, and saved `PushChordGrid-WP4-Test.als`. The user then confirmed
+  the complete physical interaction works great. WP5 has not begun.
+- **Standalone:** Still deferred by recorded user decision; WP4 preserves standalone
+  compatibility without requiring a mode switch.
+
+## 2026-08-17 — WP4 LED follow-up
+
+- **Trigger:** After accepting the musical interaction, the user reported that owned
+  pads were dark and requested the issue be fixed.
+- **Write path:** Resolve the same `Button_Matrix` object used for observation and send
+  `call send_value x y color`. This matches the working pattern inspected in the local
+  Dyad device and adds no runtime dependency.
+- **Rendering:** Send all 64 documented coordinates once after acquisition, cache the
+  palette value per coordinate, and subsequently send only differences. Held musical
+  pads override their resting color. Reserved pads are always zero.
+- **Lifecycle:** Flush active notes and clear device LED values before releasing matrix
+  ownership. Repaint after every acquisition or reconnect.
+- **Palette:** off `0`, dim neutral `1`, note `2`, held `3`, extension accent `13`,
+  root/selected quality `21`, chord `45`, tonic chord `49`.
+- **Scope:** Version 0.4.1 follow-up to accepted WP4. It does not begin WP5.
+- **Live evidence:** The agent installed 0.4.1 through Computer Use, reloaded it on
+  `WP4 Grid Source`, saved the test Set, observed `Status: matrix acquired`, and drove
+  a timed focus-away/focus-back lifecycle with Producer Pal.
+
+## 2026-08-17 — four automatic diatonic chord octaves
+
+- **Trigger:** The user requested that all bottom four rows be degrees 1–8 across four
+  octaves and that chord qualities follow the selected key automatically.
+- **Layout:** Ranks 1/2/3/4 add 0/12/24/36 semitones to Base Octave. Files A–G are
+  scale degrees 1–7 and H is tonic +12 on every row.
+- **Harmony:** Triads stack scale degrees 1/3/5. E8 and F8 independently add scale
+  degrees 7 and 9. The previous global Major/Minor/Diminished/Sus selection and fixed
+  chromatic extension formulas are superseded by this decision.
+- **Example:** A natural minor yields Am, Bdim, C, Dm, Em, F, G, Am without a quality
+  control press.
+- **Controls:** A8–D8 become reserved and silent; E8/F8 remain extensions.
+- **Scope:** Version 0.4.2 follow-up to accepted WP4. WP5 has not begun.
+- **Live evidence:** The agent installed v0.4.2 with Computer Use, selected A Minor
+  through Producer Pal, confirmed Live returned `A,B,C,D,E,F,G`, observed the acquired
+  automatic-mode device, saved the Set, and completed a timed focus lifecycle cycle.
+
+## 2026-08-17 — Orchid capability adaptation
+
+- **Trigger:** The user identified Telepathic Instruments Orchid as the reference
+  instrument, requested a manual deep dive, and authorized adapting its capabilities
+  to the established four-row Push layout.
+- **Source:** The official manual is a live public Coda document. Its exact compressed
+  public snapshot and checksum are retained under `docs/references`; the researched
+  capability mapping is `docs/ORCHID_ADAPTATION.md`. Neither enters the artifact.
+- **Core model:** Preserve automatic Live-scale harmony as the default Key Mode. Map
+  A8–D8 to momentary Dim/Min/Maj/Sus and E8–H8 to independent 6/m7/M7/9 notes. This
+  supersedes v0.4.2's two latching diatonic extensions.
+- **Voicing:** A7/B7/C7 repeatedly move the highest/lowest chord tone down/reset/up by
+  an octave, matching Orchid's inversion principle. E7/F7/G7 control bass register;
+  H7 toggles a root bass voice. Bass is MIDI in the same output stream and its sound
+  remains the responsibility of the downstream Live instrument.
+- **Playstyle:** Implement Simple snapshot semantics. Momentary modifiers affect the
+  next chord and clear on ownership loss; sounding owners keep exact snapshots.
+  Voicing and bass selections persist. Advanced/Free mutation is deferred until it has
+  lifecycle and shared-pitch acceptance vectors.
+- **Live-native boundary:** Orchid's synths, effects, beats, BPM, and looping map to
+  Live instruments/effects, Drum Rack, Set tempo, and Session clips. Timed Strum/Slop/
+  Arp/Pattern/Harp need a cancellable scheduler and are not mixed into v0.4.3.
+- **Scope:** This is authorized v0.4.3 follow-up work on accepted WP4; WP5 has not
+  begun. Standalone compatibility and the deferred consolidated gate remain intact.
+- **Live evidence:** The agent installed the final v0.4.3 artifact, replaced the source
+  track device, preserved the armed Post-FX Drift recording route and A Minor Set
+  scale, observed `Status: matrix acquired` plus the new Auto/Voice/Bass/Ext display,
+  completed a focus-away/reacquire cycle, and saved the prepared Set through MCP.
+
+## 2026-08-18 — Ableton owns timed performance transforms
+
+- **Decision:** Do not add Strum or Arp to Push Chord Grid. Place any strumming,
+  arpeggiation, rhythmic patterning, probability, or humanization in downstream
+  Ableton MIDI devices.
+- **Reason:** The device should remain a focused harmonic generator. Live already has
+  a composable MIDI-effect layer for tempo-aware event generation, and keeping that
+  layer downstream preserves exact chord snapshot and lifecycle ownership.
+- **Related modes:** Orchid-style Slop, Pattern, Harp, and similar timed transforms are
+  not current proposals. Reconsider one only if the Ableton MIDI-device chain reveals
+  a specific missing workflow.
+- **Roadmap effect:** Proposed device work is harmonic and expressive: nearest voice
+  leading, optional safe mutation of held chords, a Secret Chord layer, performance
+  snapshots, possible bass/chord output separation, and clearer chord feedback.
+- **Documentation:** `docs/USAGE_GUIDE.html` is the self-contained current-usage and
+  proposed-feature guide. Its proposed pad placements are non-binding; reserved pads
+  retain their v0.4.3 silent roles.
+
+## 2026-08-18 — physical chord-pad velocity correction
+
+- **Trigger:** The user reported that chord pads produced no usable velocity variation
+  and required physical pad velocity to drive the generated chords.
+- **Boundary:** `Button_Matrix` remains the coordinate and lifecycle authority. A
+  parallel native `midiparse` path reads Push's raw physical chord-pad notes `36–67`,
+  whose installed Push control-surface definition maps A1–H4 in row-major order.
+- **Correlation:** Raw pad messages arrive before the deferred Live API matrix
+  notification. The adapter caches velocity per coordinate, consumes it only when the
+  matching matrix press/release state agrees, and otherwise retains the matrix velocity
+  as a deterministic fallback.
+- **Musical result:** Every newly sounding pitch owned by one chord press uses that
+  press's exact velocity. Shared held pitches retain reference-count behavior and are
+  not spuriously retriggered. External MIDI passthrough is unchanged.
+- **Scope:** Version 0.4.4 behavior correction on accepted WP4. It does not begin WP5.
+
+## 2026-08-18 — harmonic feature direction approved
+
+- **Decision:** The user approved the proposed direction: nearest voice leading,
+  optional Advanced held-chord mutation, a Secret Chord layer, performance snapshots,
+  exploration of separate bass/chord output, and clearer chord feedback.
+- **Status:** Product direction only. No proposed coordinate assignment is active and
+  every currently reserved pad remains silent until a separate implementation request
+  defines and accepts the behavior.
+- **Priority:** Nearest voice leading, Advanced hold behavior, and Secret Chords retain
+  the guide's P1/P2/P3 ordering. Snapshot, routing, and feedback work remain approved
+  exploration rather than committed implementation scope.
+
+## 2026-08-18 — explicit grid recovery after device or hardware cycling
+
+- **Trigger:** The user switched the device or hardware off and the Push matrix stayed
+  dark instead of returning to the chord layout.
+- **Decision:** A device re-enable now re-runs native Push/matrix discovery. A visible
+  momentary **Reload Grid** button provides the same recovery on demand when Live keeps
+  a stale control-surface object after a hardware power cycle.
+- **Safety order:** Flush active notes and CC123, clear the owned LED frame, release the
+  prior matrix owner, clear cached surface/control IDs, defer rediscovery, reacquire,
+  then repaint all 64 coordinates.
+- **State:** Reload clears momentary quality/extension holds through the lifecycle
+  path, preserves persistent voicing/bass state, and emits no musical trigger.
+- **Scope:** Version 0.4.5 WP4 recovery correction; WP5 remains unstarted.

@@ -1,4 +1,4 @@
-/* Push Chord Grid WP2 matrix adapter.
+/* Push Chord Grid matrix adapter, proven in WP2 and integrated in WP4.
  *
  * This file deliberately uses ES5 syntax because Max's `js` runtime is the
  * runtime target. The small pure-function export at the bottom lets Node test
@@ -8,12 +8,14 @@
 if (typeof outlet !== "undefined") {
     autowatch = 0;
     inlets = 1;
-    outlets = 3;
+    outlets = 5;
 }
 
 var FILES = "ABCDEFGH";
 var GRID_SIZE = 8;
 var DEVICE_ACTIVE_PROPERTY = "is_active";
+var FIRST_PAD_NOTE = 36;
+var LAST_CHORD_PAD_NOTE = 67;
 
 function coordinateFor(x, y) {
     var column = parseInt(x, 10);
@@ -54,6 +56,48 @@ function normalizeMatrixEvent(args) {
         y: y,
         pressed: velocity > 0
     };
+}
+
+function coordinateForPadNote(note) {
+    var parsed = parseInt(note, 10);
+    if (isNaN(parsed) || parsed < FIRST_PAD_NOTE || parsed > LAST_CHORD_PAD_NOTE) {
+        return null;
+    }
+    var offset = parsed - FIRST_PAD_NOTE;
+    return FILES.charAt(offset % GRID_SIZE) + String(Math.floor(offset / GRID_SIZE) + 1);
+}
+
+function createPadVelocityCache() {
+    return Object.create(null);
+}
+
+function cachePadVelocity(cache, note, velocity) {
+    var coordinate = coordinateForPadNote(note);
+    var parsedVelocity = parseInt(velocity, 10);
+    if (
+        coordinate === null ||
+        isNaN(parsedVelocity) ||
+        parsedVelocity < 0 ||
+        parsedVelocity > 127
+    ) {
+        return null;
+    }
+    cache[coordinate] = parsedVelocity;
+    return {coordinate: coordinate, velocity: parsedVelocity};
+}
+
+function applyCachedPadVelocity(cache, event) {
+    if (!event || !Object.prototype.hasOwnProperty.call(cache, event.coordinate)) {
+        return event;
+    }
+    var velocity = cache[event.coordinate];
+    delete cache[event.coordinate];
+    if ((velocity > 0) !== event.pressed) {
+        return event;
+    }
+    event.velocity = velocity;
+    event.pressed = velocity > 0;
+    return event;
 }
 
 function createGridState() {
@@ -103,7 +147,9 @@ var matrixId = 0;
 var deviceApi = null;
 var selectedTrackApi = null;
 var watchdogTask = null;
+var rendererTask = null;
 var gridState = createGridState();
+var padVelocityCache = createPadVelocityCache();
 
 function numericId(value) {
     var parsed = parseInt(value, 10);
@@ -151,6 +197,13 @@ function integerFrom(value, fallback) {
 function emitPad(event) {
     if (runtimeAvailable) {
         outlet(0, "Pad:", event.coordinate, event.velocity);
+        outlet(3, "grid_event", event.coordinate, event.velocity);
+    }
+}
+
+function emitLifecycle(name) {
+    if (runtimeAvailable) {
+        outlet(4, "lifecycle", name);
     }
 }
 
@@ -169,6 +222,31 @@ function setNativeOwnership(value) {
     outlet(2, desired ? 1 : 0);
 }
 
+function cancelRendererTask() {
+    if (rendererTask) {
+        try {
+            rendererTask.cancel();
+        } catch (ignored) {
+            // The task may already have completed during teardown.
+        }
+    }
+    rendererTask = null;
+}
+
+function scheduleRenderer() {
+    if (!runtimeAvailable) {
+        return;
+    }
+    cancelRendererTask();
+    rendererTask = new Task(function () {
+        rendererTask = null;
+        if (acquired && !shuttingDown) {
+            outlet(3, "grid_ownership", 1);
+        }
+    }, this);
+    rendererTask.schedule(50);
+}
+
 function reconcileOwnership() {
     if (!initializedFlag || shuttingDown) {
         return;
@@ -180,9 +258,15 @@ function reconcileOwnership() {
         pushId !== 0 && matrixId !== 0
     );
     if (!desired) {
+        if (acquired) {
+            emitLifecycle(deviceEnabledFlag ? "focus_lost" : "disabled");
+            cancelRendererTask();
+            outlet(3, "grid_ownership", 0);
+        }
         setNativeOwnership(0);
         acquired = false;
         gridState = createGridState();
+        padVelocityCache = createPadVelocityCache();
         if (!deviceEnabledFlag) {
             emitStatus("device disabled");
         } else if (ownTrackId !== selectedTrackId) {
@@ -198,6 +282,7 @@ function reconcileOwnership() {
         setNativeOwnership(1);
         acquired = true;
         emitStatus("matrix acquired");
+        scheduleRenderer();
     }
 }
 
@@ -221,10 +306,19 @@ function matrix_event() {
     if (!acquired) {
         return;
     }
-    var event = applyMatrixEvent(gridState, Array.prototype.slice.call(arguments));
+    var event = normalizeMatrixEvent(Array.prototype.slice.call(arguments));
     if (event !== null) {
+        event = applyCachedPadVelocity(padVelocityCache, event);
+        gridState[event.x][event.y] = event.velocity;
         emitPad(event);
     }
+}
+
+function pad_velocity(note, velocity) {
+    if (!acquired) {
+        return;
+    }
+    cachePadVelocity(padVelocityCache, note, velocity);
 }
 
 function selectedTrackChanged(args) {
@@ -291,6 +385,24 @@ function enabled(value) {
     deviceActiveChanged(value);
 }
 
+function reload() {
+    if (!runtimeAvailable || shuttingDown) {
+        return;
+    }
+    emitStatus("reloading grid");
+    if (acquired) {
+        emitLifecycle("reload");
+        cancelRendererTask();
+        outlet(3, "grid_ownership", 0);
+    }
+    setNativeOwnership(0);
+    acquired = false;
+    pushId = 0;
+    matrixId = 0;
+    gridState = createGridState();
+    padVelocityCache = createPadVelocityCache();
+}
+
 function shutdown() {
     if (shuttingDown) {
         return;
@@ -304,11 +416,17 @@ function shutdown() {
         }
     }
     watchdogTask = null;
+    cancelRendererTask();
+    if (acquired) {
+        emitLifecycle("deleted");
+        outlet(3, "grid_ownership", 0);
+    }
     if (runtimeAvailable && ownershipRequested) {
         outlet(2, 0);
     }
     ownershipRequested = false;
     acquired = false;
+    padVelocityCache = createPadVelocityCache();
     if (deviceApi) {
         try {
             deviceApi.property = "";
@@ -334,11 +452,17 @@ function notifydeleted() {
 if (typeof module !== "undefined" && module.exports) {
     module.exports = {
         DEVICE_ACTIVE_PROPERTY: DEVICE_ACTIVE_PROPERTY,
+        FIRST_PAD_NOTE: FIRST_PAD_NOTE,
         GRID_SIZE: GRID_SIZE,
+        LAST_CHORD_PAD_NOTE: LAST_CHORD_PAD_NOTE,
+        applyCachedPadVelocity: applyCachedPadVelocity,
         applyMatrixEvent: applyMatrixEvent,
+        cachePadVelocity: cachePadVelocity,
         controlIdFrom: controlIdFrom,
         coordinateFor: coordinateFor,
+        coordinateForPadNote: coordinateForPadNote,
         createGridState: createGridState,
+        createPadVelocityCache: createPadVelocityCache,
         normalizeMatrixEvent: normalizeMatrixEvent,
         shouldOwnMatrix: shouldOwnMatrix
     };

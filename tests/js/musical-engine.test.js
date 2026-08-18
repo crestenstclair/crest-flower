@@ -7,7 +7,6 @@ const vm = require("node:vm");
 
 const active = require("../../src/core/active-notes.js");
 const harmony = require("../../src/core/harmony.js");
-const layout = require("../../src/core/note-layout.js");
 const musicalState = require("../../src/core/state.js");
 const goldenVectors = require("../fixtures/wp3-golden-vectors.json");
 
@@ -20,29 +19,22 @@ function noteOff(pitch) {
 }
 
 test("core modules load through their Max-compatible global path", () => {
-    const sandbox = {harmony, noteLayout: layout};
-    ["note-layout.js", "state.js"].forEach((filename) => {
-        const path = require.resolve(`../../src/core/${filename}`);
-        vm.runInNewContext(fs.readFileSync(path, "utf8"), sandbox, {filename: path});
-    });
-    assert.equal(sandbox.noteLayout.noteForPad(0, [0, 2, 4, 5, 7, 9, 11], 3, 1, 1), 60);
+    const sandbox = {harmony};
+    const path = require.resolve("../../src/core/state.js");
+    vm.runInNewContext(fs.readFileSync(path, "utf8"), sandbox, {filename: path});
     assert.deepEqual(
-        Array.from(sandbox.musicalState.chordForDegree(sandbox.musicalState.createState(), 1)),
+        Array.from(sandbox.musicalState.chordForPad(sandbox.musicalState.createState(), 1, 1)),
         [60, 64, 67]
     );
 });
 
-test("C major, E minor, and D Dorian match table-driven golden vectors", () => {
+test("C major, A natural minor, and D Dorian auto-harmonize all four rows", () => {
     goldenVectors.forEach((vector) => {
         const state = musicalState.createState({
             rootNote: vector.rootNote,
             scaleIntervals: vector.intervals,
             baseOctave: 3
         });
-        musicalState.selectQuality(state, vector.quality);
-        if (vector.seventh) musicalState.toggleExtension(state, 7);
-        if (vector.ninth) musicalState.toggleExtension(state, 9);
-
         assert.deepEqual(
             Array.from({length: 8}, (_, index) => harmony.degreeRoot(
                 vector.rootNote,
@@ -53,8 +45,23 @@ test("C major, E minor, and D Dorian match table-driven golden vectors", () => {
             vector.degreeRoots,
             `${vector.name} degree roots`
         );
-        assert.deepEqual(layout.threeRowLayout(vector.rootNote, vector.intervals, 3), vector.layout);
-        assert.deepEqual(musicalState.chordForDegree(state, vector.degree), vector.chord);
+        for (let row = 1; row <= 4; row += 1) {
+            assert.deepEqual(
+                Array.from({length: 8}, (_, index) =>
+                    musicalState.chordForPad(state, row, index + 1)
+                ),
+                vector.triads.map((chord) => chord.map((pitch) => pitch + (row - 1) * 12)
+                    .filter((pitch) => pitch <= 127)),
+                `${vector.name} row ${row}`
+            );
+        }
+        ["sixth", "minor_seventh", "major_seventh", "ninth"].forEach((extension) => {
+            musicalState.setExtension(state, extension, true);
+        });
+        assert.deepEqual(
+            musicalState.chordForPad(state, 1, vector.extendedDegree),
+            vector.extendedChord
+        );
     });
 });
 
@@ -68,43 +75,109 @@ test("degree 8 is tonic plus an octave even for a non-heptatonic scale", () => {
     );
 });
 
-test("all quality and independent extension formulas are exact", () => {
-    const vectors = [
-        ["major", false, false, [60, 64, 67]],
-        ["minor", true, false, [60, 63, 67, 70]],
-        ["diminished", false, true, [60, 63, 66, 74]],
-        ["sus", true, true, [60, 65, 67, 70, 74]]
-    ];
-    vectors.forEach(([quality, seventh, ninth, expected]) => {
-        assert.deepEqual(harmony.chordPitches(60, quality, seventh, ninth), expected);
-    });
-    assert.deepEqual(harmony.chordPitches(null, "major", false, false), []);
-    assert.deepEqual(harmony.chordPitches(120, "major", true, true), [120, 124, 127]);
+test("Orchid chord types and four independent extensions use exact intervals", () => {
+    assert.deepEqual(harmony.qualityChordPitches(60, "diminished"), [60, 63, 66]);
+    assert.deepEqual(harmony.qualityChordPitches(60, "minor"), [60, 63, 67]);
+    assert.deepEqual(harmony.qualityChordPitches(60, "major"), [60, 64, 67]);
+    assert.deepEqual(harmony.qualityChordPitches(60, "suspended"), [60, 65, 67]);
+    assert.deepEqual(
+        harmony.addExtensions([60, 64, 67], 60, {
+            sixth: true,
+            minor_seventh: true,
+            major_seventh: true,
+            ninth: true
+        }),
+        [60, 64, 67, 69, 70, 71, 74]
+    );
+    assert.deepEqual(
+        harmony.addExtensions([120, 124, 127], 120, {
+            sixth: true,
+            minor_seventh: true,
+            major_seventh: true,
+            ninth: true
+        }),
+        [120, 124, 127]
+    );
 });
 
-test("quality is a radio selection and extensions toggle independently", () => {
+test("voicing walks the lowest or highest chord tone by exact octaves", () => {
+    assert.deepEqual(harmony.applyVoicing([60, 64, 67], 0), [60, 64, 67]);
+    assert.deepEqual(harmony.applyVoicing([60, 64, 67], 1), [64, 67, 72]);
+    assert.deepEqual(harmony.applyVoicing([60, 64, 67], 3), [72, 76, 79]);
+    assert.deepEqual(harmony.applyVoicing([60, 64, 67], -1), [55, 60, 64]);
+    assert.deepEqual(harmony.applyVoicing([60, 64, 67], -3), [48, 52, 55]);
+    assert.deepEqual(harmony.applyVoicing([127], 1), [127]);
+    assert.deepEqual(harmony.applyVoicing([120, 124, 127], 1), [120, 124, 127]);
+    assert.deepEqual(harmony.applyVoicing([0], -1), [0]);
+    assert.deepEqual(harmony.applyVoicing([], 4), []);
+    assert.deepEqual(harmony.normalizedPitches([64, 60, 64]), [60, 64]);
+});
+
+test("state controls affect future chords and lifecycle reset preserves persistent choices", () => {
     const state = musicalState.createState();
     assert.deepEqual(state, {
-        quality: "major",
-        seventhEnabled: false,
-        ninthEnabled: false,
+        chordType: "auto",
+        extensions: {
+            sixth: false,
+            minor_seventh: false,
+            major_seventh: false,
+            ninth: false
+        },
+        voicing: 0,
+        bassEnabled: false,
+        bassOctave: -1,
         rootNote: 0,
         scaleIntervals: [0, 2, 4, 5, 7, 9, 11],
         baseOctave: 3
     });
-    musicalState.selectQuality(state, "minor");
-    assert.equal(state.quality, "minor");
-    assert.equal(musicalState.toggleExtension(state, 7), true);
-    assert.equal(musicalState.toggleExtension(state, 9), true);
-    assert.equal(musicalState.toggleExtension(state, 7), false);
-    assert.equal(musicalState.toggleExtension(state, 9), false);
+
+    musicalState.setChordType(state, "minor");
+    musicalState.setExtension(state, "ninth", true);
+    musicalState.setVoicing(state, 1);
+    assert.equal(musicalState.shiftVoicing(state, -1), 0);
+    assert.equal(musicalState.shiftVoicing(state, 1), 1);
+    assert.equal(musicalState.toggleBass(state), true);
+    musicalState.setBassOctave(state, -2);
+    assert.equal(musicalState.shiftBassOctave(state, 1), -1);
+    assert.equal(musicalState.shiftBassOctave(state, -1), -2);
+    assert.deepEqual(musicalState.chordForPad(state, 1, 1), [36, 63, 67, 72, 74]);
+
+    musicalState.resetMomentaryModifiers(state);
+    assert.equal(state.chordType, "auto");
+    assert.deepEqual(state.extensions, {
+        sixth: false,
+        minor_seventh: false,
+        major_seventh: false,
+        ninth: false
+    });
+    assert.equal(state.voicing, 1);
+    assert.equal(state.bassEnabled, true);
+    assert.equal(state.bassOctave, -2);
+
+    musicalState.setVoicing(state, 16);
+    assert.equal(musicalState.shiftVoicing(state, 1), 16);
+    musicalState.setVoicing(state, -16);
+    assert.equal(musicalState.shiftVoicing(state, -1), -16);
+    musicalState.setBassOctave(state, 1);
+    assert.equal(musicalState.shiftBassOctave(state, 1), 1);
+    musicalState.setBassOctave(state, -4);
+    assert.equal(musicalState.shiftBassOctave(state, -1), -4);
+    assert.equal(musicalState.toggleBass(state), false);
 });
 
-test("scale updates and note-pad lookup use the current state", () => {
+test("scale and octave updates affect future chord rows", () => {
     const state = musicalState.createState({baseOctave: 4});
     musicalState.updateScale(state, 4, [0, 2, 3, 5, 7, 8, 10]);
-    assert.equal(musicalState.noteForPad(state, 2, 1), 81);
-    assert.equal(musicalState.noteForPad(state, 3, 8), 98);
+    musicalState.updateBaseOctave(state, 5);
+    assert.deepEqual(musicalState.chordForPad(state, 1, 1), [88, 91, 95]);
+    assert.deepEqual(musicalState.chordForPad(state, 2, 8), [112, 115, 119]);
+});
+
+test("bass is independent from chord voicing and remains MIDI-safe", () => {
+    assert.deepEqual(harmony.addBass([60, 64, 67], 60, false, -1), [60, 64, 67]);
+    assert.deepEqual(harmony.addBass([64, 67, 72], 60, true, -1), [48, 64, 67, 72]);
+    assert.deepEqual(harmony.addBass([4, 7], 4, true, -1), [4, 7]);
+    assert.deepEqual(harmony.addBass([120], 120, true, 1), [120]);
 });
 
 test("velocity is preserved and shared pitches use reference counts", () => {
@@ -129,13 +202,13 @@ test("velocity is preserved and shared pitches use reference counts", () => {
 test("held owners release their exact note-on snapshot after state changes", () => {
     const state = musicalState.createState();
     const notes = active.createActiveNotes();
-    const original = musicalState.chordForDegree(state, 1);
+    const original = musicalState.chordForPad(state, 1, 1);
     assert.deepEqual(active.pressOwner(notes, "A4", original, 88), [
         noteOn(60, 88), noteOn(64, 88), noteOn(67, 88)
     ]);
 
-    musicalState.selectQuality(state, "diminished");
-    musicalState.toggleExtension(state, 7);
+    musicalState.setChordType(state, "minor");
+    musicalState.setExtension(state, "ninth", true);
     musicalState.updateScale(state, 4, [0, 2, 3, 5, 7, 8, 10]);
     assert.deepEqual(active.releaseOwner(notes, "A4"), [noteOff(60), noteOff(64), noteOff(67)]);
 });
@@ -164,7 +237,7 @@ test("panic always flushes exact notes in pitch order and finishes with CC123", 
 });
 
 test("every note-loss lifecycle path performs the same all-notes-off flush", () => {
-    ["panic", "focus_lost", "disabled", "deleted", "set_closed"].forEach((lifecycle) => {
+    ["panic", "focus_lost", "disabled", "reload", "deleted", "set_closed"].forEach((lifecycle) => {
         const notes = active.createActiveNotes();
         active.pressOwner(notes, "A4", [60], 64);
         assert.deepEqual(active.flushForLifecycle(notes, lifecycle), [
@@ -189,13 +262,30 @@ test("invalid musical inputs fail deterministically", () => {
     assert.throws(() => harmony.tonicPitch(0, 9), /base octave/);
     assert.throws(() => harmony.scaleDegreePitch(0, [0, 2], 3, -1), /degree index/);
     assert.throws(() => harmony.degreeRoot(0, [0, 2], 3, 0), /degree/);
-    assert.throws(() => harmony.chordPitches(60, "other", false, false), /unknown chord/);
-    assert.throws(() => harmony.chordPitches(128, "major", false, false), /chord root/);
-    assert.throws(() => layout.noteForPad(0, [0, 2], 3, 0, 1), /row/);
-    assert.throws(() => layout.noteForPad(0, [0, 2], 3, 1, 9), /column/);
-    assert.throws(() => musicalState.selectQuality(musicalState.createState(), "other"), /quality/);
-    assert.throws(() => musicalState.toggleExtension(musicalState.createState(), 11), /extension/);
-    assert.throws(() => musicalState.updateScale(musicalState.createState(), 12, [0]), /root note/);
+    assert.throws(() => harmony.normalizedPitches([128]), /pitch/);
+    assert.throws(() => harmony.qualityChordPitches(60, "auto"), /chord type/);
+    assert.throws(() => harmony.qualityChordPitches(128, "major"), /chord root/);
+    assert.throws(
+        () => harmony.diatonicChordPitches(0, [0, 2], 3, 0, 1),
+        /chord row/
+    );
+    assert.throws(
+        () => harmony.diatonicChordPitches(0, [0, 2], 3, 1, 9),
+        /degree/
+    );
+    assert.throws(() => harmony.applyVoicing([60], 17), /voicing/);
+    assert.throws(() => harmony.addBass([], 60, false, 2), /bass octave/);
+
+    const state = musicalState.createState();
+    assert.throws(() => musicalState.setChordType(state, "power"), /chord type/);
+    assert.throws(() => musicalState.setExtension(state, "eleventh", true), /extension/);
+    assert.throws(() => musicalState.setExtension(state, "ninth", 1), /boolean/);
+    assert.throws(() => musicalState.setVoicing(state, -17), /voicing/);
+    assert.throws(() => musicalState.shiftVoicing(state, 0), /direction/);
+    assert.throws(() => musicalState.setBassOctave(state, -5), /bass octave/);
+    assert.throws(() => musicalState.shiftBassOctave(state, 0), /direction/);
+    assert.throws(() => musicalState.updateScale(state, 12, [0]), /root note/);
+    assert.throws(() => musicalState.updateBaseOctave(state, 9), /base octave/);
     assert.throws(() => musicalState.createState({baseOctave: -1}), /base octave/);
     assert.throws(() => musicalState.createState({scaleIntervals: null}), /scale intervals/);
     assert.throws(() => active.pressOwner(active.createActiveNotes(), "A1", [60], 0), /velocity/);
@@ -204,10 +294,33 @@ test("invalid musical inputs fail deterministically", () => {
     assert.throws(() => active.pressOwner(active.createActiveNotes(), "A1", [128], 10), /pitch/);
 });
 
-test("out-of-range high notes return null and create no MIDI pitch", () => {
+test("out-of-range high notes return no MIDI pitch", () => {
     const state = musicalState.createState({rootNote: 11, scaleIntervals: [0, 11], baseOctave: 8});
     assert.equal(harmony.degreeRoot(11, [0], 8, 8), null);
     assert.equal(harmony.scaleDegreePitch(11, [0, 11], 8, 1), null);
-    assert.equal(musicalState.noteForPad(state, 3, 8), null);
-    assert.deepEqual(musicalState.chordForDegree(state, 1), []);
+    assert.deepEqual(musicalState.chordForPad(state, 4, 8), []);
+    assert.deepEqual(harmony.qualityChordPitches(127, "major"), [127]);
+    assert.deepEqual(
+        harmony.diatonicChordPitches(0, [0, 2, 4, 5, 7, 9, 11], 8, 1, 2),
+        [122, 125]
+    );
+    assert.deepEqual(
+        harmony.diatonicChordPitches(0, [0, 2, 4, 5, 7, 9, 11], 7, 2, 2),
+        [122, 125]
+    );
+    assert.deepEqual(
+        harmony.orchidChordPitches(
+            0,
+            [0, 2, 4, 5, 7, 9, 11],
+            8,
+            2,
+            1,
+            "auto",
+            {sixth: false, minor_seventh: false, major_seventh: false, ninth: false},
+            0,
+            false,
+            -1
+        ),
+        []
+    );
 });

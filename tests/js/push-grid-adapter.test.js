@@ -74,6 +74,67 @@ test("selector-prefixed matrix callbacks remain accepted", () => {
     );
 });
 
+test("physical chord-pad MIDI notes map to the same 32 matrix coordinates", () => {
+    const observed = [];
+    for (let note = 36; note <= 67; note += 1) {
+        observed.push(adapter.coordinateForPadNote(note));
+    }
+    assert.deepEqual(observed, [
+        "A1", "B1", "C1", "D1", "E1", "F1", "G1", "H1",
+        "A2", "B2", "C2", "D2", "E2", "F2", "G2", "H2",
+        "A3", "B3", "C3", "D3", "E3", "F3", "G3", "H3",
+        "A4", "B4", "C4", "D4", "E4", "F4", "G4", "H4"
+    ]);
+    assert.equal(adapter.coordinateForPadNote(35), null);
+    assert.equal(adapter.coordinateForPadNote(68), null);
+    assert.equal(adapter.coordinateForPadNote("bad"), null);
+});
+
+test("raw Push strike velocity overrides a fixed matrix press value", () => {
+    const cache = adapter.createPadVelocityCache();
+    assert.deepEqual(adapter.cachePadVelocity(cache, 36, 23), {
+        coordinate: "A1", velocity: 23
+    });
+    assert.deepEqual(
+        adapter.applyCachedPadVelocity(
+            cache,
+            adapter.normalizeMatrixEvent([127, 0, 7])
+        ),
+        {coordinate: "A1", velocity: 23, x: 0, y: 7, pressed: true}
+    );
+    assert.equal(Object.keys(cache).length, 0);
+
+    adapter.cachePadVelocity(cache, 67, 118);
+    assert.deepEqual(
+        adapter.applyCachedPadVelocity(
+            cache,
+            adapter.normalizeMatrixEvent([127, 7, 4])
+        ),
+        {coordinate: "H4", velocity: 118, x: 7, y: 4, pressed: true}
+    );
+});
+
+test("velocity correlation preserves releases, mismatches, and matrix fallback", () => {
+    const cache = adapter.createPadVelocityCache();
+    adapter.cachePadVelocity(cache, 44, 0);
+    assert.deepEqual(
+        adapter.applyCachedPadVelocity(cache, adapter.normalizeMatrixEvent([0, 0, 6])),
+        {coordinate: "A2", velocity: 0, x: 0, y: 6, pressed: false}
+    );
+
+    adapter.cachePadVelocity(cache, 37, 76);
+    assert.deepEqual(
+        adapter.applyCachedPadVelocity(cache, adapter.normalizeMatrixEvent([0, 1, 7])),
+        {coordinate: "B1", velocity: 0, x: 1, y: 7, pressed: false}
+    );
+    assert.deepEqual(
+        adapter.applyCachedPadVelocity(cache, adapter.normalizeMatrixEvent([54, 2, 7])),
+        {coordinate: "C1", velocity: 54, x: 2, y: 7, pressed: true}
+    );
+    assert.equal(adapter.cachePadVelocity(cache, 68, 99), null);
+    assert.equal(adapter.cachePadVelocity(cache, 36, 128), null);
+});
+
 test("ownership requires enablement, Push availability, and selected own track", () => {
     assert.equal(adapter.shouldOwnMatrix(true, 42, 42, true), true);
     assert.equal(adapter.shouldOwnMatrix(false, 42, 42, true), false);

@@ -10,6 +10,21 @@ remains a product constraint throughout, but WP1–WP5 are developed and accepte
 Live 12 with Push in Control Mode. Do not require Standalone switching, transfer, or
 testing before the final integration gate.
 
+WP4 implementation note (2026-08-17): automated checks and the MCP-addressable Live
+preflight passed, and the user confirmed the complete physical interaction works
+great. WP4 is accepted. A subsequent authorized 0.4.1 follow-up implements the planned
+LED renderer because the accepted v0 matrix was dark. Version 0.4.2 replaces the
+performance area with four octave-spaced, automatically diatonic chord rows. Version
+0.4.3 adapts Telepathic Instruments Orchid's chord-type, 6/m7/M7/9, inversion, and bass
+model while preserving those automatic rows. Strum and Arp are explicitly delegated
+to downstream Ableton MIDI devices; other timed performance transforms are not
+proposed unless that composable Live workflow exposes a concrete gap. The current
+harmonic follow-up proposals are documented in `docs/USAGE_GUIDE.html`; WP5 has not
+begun. Version 0.4.4 correlates raw physical chord-pad velocities with matrix
+coordinates and records the proposed harmonic feature set as approved direction.
+Version 0.4.5 adds automatic re-enable discovery and a safe manual Reload Grid path
+for stale matrix ownership after device or hardware cycling.
+
 ## 1. Intent
 
 This project is to be built by an LLM coding agent. The user defines the musical behavior and performs unavoidable tests on the physical Push. The agent owns the rest:
@@ -23,21 +38,59 @@ This project is to be built by an LLM coding agent. The user defines the musical
 - Producing packaged `.amxd` builds.
 - Diagnosing failures from logs and concise hardware-test results.
 - Maintaining documentation and release notes.
+- Operating Live through connected MCP tools for installation, Set construction,
+  routing, recording, inspection, focus/lifecycle tests, and evidence capture.
 
 The user should **not** have to open Max and draw patch cords, manually transcribe code, configure MIDI mappings, write a Remote Script, or assemble the device from tutorial material.
 
 ## 2. Necessary human actions
 
-The project should minimize human work to actions an LLM cannot perform without direct access to the physical Push/Live GUI:
+The project minimizes human work to actions the agent cannot perform through repository
+tools, Producer Pal, Computer Use, or another connected MCP:
 
 1. Make any unresolved musical choice when it materially changes behavior.
-2. Run a generated build on Live/Push when the agent reaches a hardware gate.
-3. Press the pads listed on a short generated test card.
-4. Return the observed result or a screenshot/log to the agent.
-5. Transfer the finished package to Push's User Library.
-6. If no reproducible command-line equivalent exists, perform the one final Max **Freeze Device** action for release packaging. The agent supplies exact one-step instructions and has already validated everything else.
+2. Physically touch Push pads or hardware controls only when no connected tool can
+   originate the required hardware callback. The agent prepares the Set, starts and
+   stops recording, changes focus/state, and reads the resulting MIDI or UI evidence.
+3. Perform a Push-local or Standalone action only after the agent has verified that no
+   connected MCP can perform it.
+4. If no reproducible command-line or MCP equivalent exists, perform the one final Max
+   **Freeze Device** action for release packaging. The agent supplies the single action
+   only after every other check passes.
 
 Hardware testing is not “helping develop the plugin.” It is acceptance testing an artifact produced by the agent.
+
+### MCP-first execution policy
+
+The agent owns all Live-side acceptance work exposed by connected tools. Before asking
+the user to do anything, it must inspect available MCP capabilities and use them in
+this order:
+
+1. **Producer Pal** for semantic Live operations: connect to the open Set; read and
+   update Set scale; create, name, arm, route, and inspect tracks; create stock devices;
+   select tracks/devices; control playback; and read recorded MIDI clips and device
+   parameters.
+2. **Computer Use** for Live or Finder UI operations not exposed by Producer Pal:
+   install/load the generated AMXD, operate device activators and dialogs, inspect
+   visible device status, save a dedicated test Set, and capture screenshots. Follow
+   the Computer Use skill and drive the Mac through its `node_repl` interface.
+3. Repository tools for deterministic generation, static inspection, checksums, and
+   packaging.
+4. User action only for a confirmed physical-only gap, such as contact with a Push pad
+   when no MCP can originate a `Button_Matrix` callback.
+
+An unavailable operation is not presumed to require the user. The agent must first
+check Producer Pal, then Computer Use, and record the exact unsupported boundary. It
+must not ask the user to install an artifact, create or route tracks, add a stock
+instrument, arm or start recording, change Live's scale, switch track focus, toggle a
+device, save a Set, inspect a MIDI clip, or return screenshots/logs when a connected
+MCP can do that work.
+
+At a hardware gate the agent prepares and saves the complete test Set, performs every
+MCP-addressable step, records those results in `docs/HARDWARE_TESTS.md`, and reduces any
+remaining user interaction to the smallest physical contact sequence. After contact,
+the agent—not the user—reads recorded notes, status, screenshots, and logs through MCP
+where possible.
 
 ## 3. Product definition
 
@@ -45,12 +98,19 @@ Build a Max for Live MIDI Effect that turns Push 3's 8×8 pad matrix into a spli
 
 - Ranks 1–4: performance area.
 - Ranks 5–8: controls.
-- Rank 4 triggers chords by scale degree.
-- Ranks 1–3 play individual notes.
-- Rank 8 selects chord quality and extensions.
+- Ranks 1–4 each trigger chords by scale degree, one octave per row.
+- Chord quality is derived automatically from Live's active root and scale.
+- Rank 8 provides momentary Dim/Min/Maj/Sus overrides plus independent
+  6/m7/M7/9 extensions.
+- Rank 7 provides persistent chord-voicing and bass-register controls.
 - The device produces MIDI and sits before any Ableton instrument.
 - It works on Push 3 Standalone after a one-time transfer.
 - During ordinary use it requires no computer, User Mode, MIDI mapping, Remote Script, helper application, or setup dialog.
+
+The device owns harmonic generation, chord coloration, voicing, and its optional bass
+voice. Ableton's downstream MIDI-effect chain owns Strum, Arp, rhythmic patterning,
+probability, and humanization. Instruments, audio effects, tempo, looping, and
+arrangement likewise remain native to Live.
 
 The runtime artifact must be a Max for Live MIDI Effect. Push Standalone does not host VST/AU plug-ins, and a Live 12 MIDI Tool edits clip data rather than processing a real-time performance.
 
@@ -63,56 +123,50 @@ Coordinates use chess notation:
 
 | Pads | Function | v0 behavior |
 | --- | --- | --- |
-| A8 | Major | Selects major triad; mutually exclusive with B8–D8 |
-| B8 | Minor | Selects minor triad; mutually exclusive with A8, C8, D8 |
-| C8 | Diminished | Selects diminished triad; mutually exclusive with A8, B8, D8 |
-| D8 | Sus | Selects sus4 triad; mutually exclusive with A8–C8 |
-| E8 | 7 | Independent extension toggle |
-| F8 | 9 | Independent extension toggle |
-| G8–H8 | Reserved | No output |
-| A5–H7 | Reserved controls | No output |
-| A4–H4 | Degrees 1–8 | Triggers the selected chord on degrees 1–7; degree 8 is the tonic an octave higher |
-| A1–H3 | Notes | Scale-aware individual notes in a Push-like overlapping-fourths layout |
+| A8–D8 | Dim/Min/Maj/Sus | Momentary manual quality override; no direct trigger |
+| E8–H8 | 6/m7/M7/9 | Independent momentary extension; no direct trigger |
+| A7–C7 | Chord voicing | Down/reset/up one inversion step; no direct trigger |
+| D7 | Reserved | No output |
+| E7–G7 | Bass register | Down/reset-to-−1/up one octave; no direct trigger |
+| H7 | Bass | Toggle root bass voice; no direct trigger |
+| A5–H6 | Reserved controls | No output |
+| A1–H1 | Chords, octave 1 | Degrees 1–8 from Base Octave |
+| A2–H2 | Chords, octave 2 | Same degrees, +12 semitones |
+| A3–H3 | Chords, octave 3 | Same degrees, +24 semitones |
+| A4–H4 | Chords, octave 4 | Same degrees, +36 semitones |
 
 Interaction defaults:
 
-- A8–D8 form a latching radio group.
-- E8 and F8 latch independently.
-- Initial state is Major with extensions off.
-- Degree pads are velocity-sensitive.
+- Chord types and extensions are momentary. Initial state is automatic diatonic
+  harmony with extensions off.
+- Voicing defaults to root position. Bass defaults off at one octave below the root.
+- All 32 chord pads are velocity-sensitive.
 - Multiple degree pads may be held simultaneously.
-- A held chord retains the exact voices created on note-on. Changing quality affects the next chord.
+- A held chord retains the exact voices created on note-on. Live scale changes affect
+  the next chord.
 - Active outputs are tracked per physical pad. Shared pitches are reference-counted to prevent stuck or prematurely terminated notes.
 - Control and reserved pads never leak trigger notes to the downstream instrument.
 
-Unless changed before implementation:
-
-- `7` adds a minor seventh (`+10`).
-- `9` behaves as add9 (`+14`) and does not imply a seventh.
-- Enabling both creates the seventh-plus-ninth set.
+Automatic triads stack scale degrees 1/3/5 from each pad's root. Manual chord types use
+0/3/6 (Dim), 0/3/7 (Min), 0/4/7 (Maj), and 0/5/7 (Sus). Extensions independently add
+root-relative +9 (6), +10 (m7), +11 (M7), and +14 (9) without implying one another.
 
 ## 5. Key, scale, and pitch behavior
 
 The device observes the Live Set instead of maintaining a second key/scale setup:
 
 - Read and observe `live_set.root_note`, `live_set.scale_intervals`, `live_set.scale_name`, and `live_set.scale_mode` through the Live Object Model.
-- Map A4–G4 to the first seven scale degrees.
-- Map H4 to the tonic plus 12 semitones.
+- Map A–G on every chord row to the first seven scale degrees.
+- Map H on every chord row to the tonic plus 12 semitones.
+- Add 0/12/24/36 semitones for ranks 1/2/3/4.
 - Continue using Live's selected root and scale when Scale Mode is off.
-- For non-heptatonic scales, v0 uses the first seven returned degrees and keeps H4 as the octave.
-- Ranks 1–3 use adjacent scale degrees horizontally and begin each higher row a diatonic fourth above the previous row, producing a familiar overlapping shape.
+- For non-heptatonic scales, use the first seven returned degrees and keep H as the octave.
 - Base Octave is a stored parameter with a playable default; configuration is optional.
 
-Chord formulas:
-
-| Quality | Intervals |
-| --- | --- |
-| Major | 0, 4, 7 |
-| Minor | 0, 3, 7 |
-| Diminished | 0, 3, 6 |
-| Sus | 0, 5, 7 |
-| 7 modifier | +10 |
-| 9 modifier | +14 |
+Automatic chord voices use scale-degree offsets 1/3/5, so their qualities follow Live.
+Momentary manual quality formulas and extension offsets are the fixed chromatic values
+recorded in the grid contract above. Voicing changes octave placement only; bass stays
+tied to the harmonic root through its independent register.
 
 ## 6. Agent-first implementation strategy
 
@@ -154,7 +208,6 @@ push-chord-grid/
 │   ├── core/
 │   │   ├── coordinates.js
 │   │   ├── harmony.js
-│   │   ├── note-layout.js
 │   │   ├── active-notes.js
 │   │   └── state.js
 │   └── max/
@@ -209,9 +262,9 @@ Generated PushChordGrid.amxd
 ├── Live scale adapter
 │   └── root/scale observers
 ├── Grid router
-│   └── coordinate → control/chord/note event
+│   └── coordinate → control/chord event
 ├── Harmony/state engine
-│   └── quality, extensions, scale degrees, note layout
+│   └── automatic diatonic harmony, extensions, octave rows
 ├── Active-note manager
 │   └── exact note-on/off ownership and reference counts
 └── MIDI output
@@ -225,7 +278,8 @@ Hardware ownership policy:
 4. Only the instance on the selected track owns the grid.
 5. Reacquire after reconnect/Set reload with delayed initialization and a small watchdog.
 6. Maintain a normalized `GridState[8][8]` from the first build.
-7. In v0, the LED renderer is a no-op. The matrix may therefore be dark while owned.
+7. Version 0.4.1 renders state-aware pad colors, repaints after acquisition, updates
+   only changed values, and clears device colors before releasing the matrix.
 
 Runtime constraints:
 
@@ -338,16 +392,16 @@ Gate: every reported coordinate/lifecycle result matches without manual Reset.
 
 The agent implements and tests, without requiring Push:
 
-- Quality and extension state.
+- Automatic diatonic harmony and extension state.
 - Scale-degree roots.
 - Degree 8 octave behavior.
-- Three-row note layout.
+- Four octave-spaced chord rows.
 - Velocity.
 - Overlapping chords and shared-pitch reference counts.
 - Exact release behavior.
 - Panic/all-notes-off lifecycle.
 
-Tests use table-driven golden vectors covering C major, E minor, and a modal scale.
+Tests use table-driven golden vectors covering C major, A natural minor, and D Dorian.
 
 Gate: complete branch coverage for the deterministic core and no unresolved musical assumptions.
 
@@ -365,8 +419,12 @@ Automated gate:
 
 Hardware gate:
 
-- Test the six controls, eight chord pads, sample note pads, recording, focus changes, and overlapping holds using a generated checklist.
-- User returns results; agent iterates as necessary.
+- Test the two controls, all four chord octaves, automatic C major/A minor harmony,
+  recording, focus changes, and overlapping holds using a generated checklist.
+- Agent uses Producer Pal and Computer Use to install the build, prepare and save the
+  test Set, configure Post-FX recording, change scale/focus/device state, and inspect
+  recorded MIDI and UI status. The user supplies only physical pad contact that no MCP
+  can originate; the agent captures results and iterates as necessary.
 
 ### WP5 — Live hardening and release candidate
 
@@ -407,21 +465,73 @@ Final hardware gate:
 
 Gate: Standalone acceptance completes v0 and authorizes the final release bundle.
 
-### Post-v0 — future LED/parseability release
+### WP4 follow-up — LED renderer (implemented in 0.4.1)
 
-This is planned now but not required for v0.
+The authorized follow-up implements the existing LED renderer interface with
+diff-based updates:
 
-The agent implements the existing LED renderer interface with diff-based updates:
-
-- Unselected qualities: dim neutral.
-- Selected quality: bright.
 - Enabled 7/9: bright accent.
-- Degree pads: common family; tonic distinct.
+- Chord pads: common family; tonic distinct.
 - Held chord: high brightness.
-- Notes: root emphasized; other scale notes dimmer.
 - Reserved pads: off.
 
-Repaint after acquire/reconnect. Stop LED writes before releasing the matrix. Add a compact Push parameter bank later for Quality, 7, 9, Base Octave, and key/scale label.
+Repaint after acquire/reconnect. Stop LED writes before releasing the matrix. A compact
+Push parameter bank for 7, 9, Base Octave, and key/scale label remains later
+work and is not part of this follow-up.
+
+### WP4 follow-up — four automatic chord octaves (implemented in 0.4.2)
+
+- Ranks 1–4 are four octave-spaced copies of chord degrees 1–8.
+- Chord tones stack the current Live scale at degrees 1/3/5, producing the correct
+  diatonic quality for each root automatically.
+- E8/F8 add scale-derived degrees 7/9; A8–D8 are no longer quality overrides.
+- Held owners retain their note-on snapshot across scale or extension changes.
+- Golden vectors cover all 32 pads in C major, A natural minor, and D Dorian.
+
+### WP4 follow-up — Orchid harmonic surface (implemented in 0.4.3)
+
+- The official Orchid manual is captured as a reproducible public Coda snapshot and
+  its complete capability mapping is recorded in `docs/ORCHID_ADAPTATION.md`.
+- A8–D8 are momentary Dim/Min/Maj/Sus overrides. With none held, Live's active scale
+  continues to determine every chord automatically.
+- E8–H8 independently add 6/m7/M7/9 using Orchid's exact root-relative meanings.
+- A7/B7/C7 move the chord voicing down/reset/up by cascading the highest or lowest
+  tone one octave. E7/F7/G7 do the same for bass register; H7 toggles bass.
+- The release implements Orchid's snapshot-oriented Simple playstyle. Held owners do
+  not mutate when modifiers are released, and momentary state clears on lifecycle
+  loss. Persistent voicing and bass state remains.
+- Orchid's synth engines, effects, beat machine, clock, and looper map to Live-native
+  instruments, effects, tempo, Drum Rack, and Session clips. Timed performance modes,
+  Advanced/Free playstyles, secret chords, and separate MIDI streams remain explicit
+  follow-up candidates rather than being mixed into the safe harmonic engine.
+- The agent installed the final build in the existing MCP-created Live test Set,
+  verified the new display and matrix acquisition, exercised focus reacquisition, and
+  saved the Set without delegating any Live-side work to the user.
+
+### WP4 follow-up — physical chord-pad velocity (implemented in 0.4.4)
+
+- Keep `Button_Matrix` as the coordinate, ownership, and lifecycle source.
+- Parse Push physical note messages `36–67` with Max-native `midiparse` and map them
+  exactly to A1–H4.
+- Correlate raw strike velocity with the matching deferred matrix event; use the
+  matrix value as fallback when no matching raw event exists.
+- Apply the resolved velocity to every newly sounding pitch in the generated chord.
+- Preserve raw external MIDI passthrough, snapshot ownership, shared-pitch reference
+  counts, lifecycle flushes, LEDs, and Standalone-compatible dependencies.
+- Nearest voice leading, Advanced held-chord behavior, Secret Chords, performance
+  snapshots, split output exploration, and clearer feedback are approved product
+  direction only. They remain unimplemented pending their own work package.
+
+### WP4 follow-up — resilient grid recovery (implemented in 0.4.5)
+
+- Re-run native Push and `Button_Matrix` discovery whenever the device is re-enabled,
+  then reacquire and repaint the complete grid.
+- Expose one momentary **Reload Grid** control on the device face for stale ownership
+  after hardware power changes or Live control-surface churn.
+- Reload must flush active notes plus CC123, clear LEDs, release the old owner,
+  rediscover Push, reacquire the matrix, and repaint all 64 coordinates.
+- Reload emits no musical trigger and preserves persistent voicing/bass state while
+  clearing momentary controls through the existing lifecycle contract.
 
 ## 10. Automated validation requirements
 
@@ -431,7 +541,7 @@ The LLM must be able to prove most behavior without hardware:
 | --- | --- |
 | Coordinates | Synthetic events cover all 64 pads and chess mapping |
 | Harmony | Golden input/output pitch vectors |
-| State | Radio/toggle transitions and held-chord snapshots |
+| State | Extension toggles, scale transitions, and held-chord snapshots |
 | Note lifecycle | Overlap, shared pitches, rapid retrigger, focus loss, panic |
 | Generator | Expected objects, connections, attributes, parameter names |
 | Compatibility | Static forbidden-object/dependency scan |

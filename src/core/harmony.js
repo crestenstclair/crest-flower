@@ -2,14 +2,21 @@
 
 /* Deterministic harmony functions shared by Node tests and Max's ES5 `js` runtime. */
 
-var QUALITY_INTERVALS = {
-    major: [0, 4, 7],
-    minor: [0, 3, 7],
-    diminished: [0, 3, 6],
-    sus: [0, 5, 7]
-};
 var MIDI_MAX_PITCH = 127;
 var LIVE_OCTAVE_OFFSET = 2;
+var CHORD_INTERVALS = {
+    diminished: [0, 3, 6],
+    minor: [0, 3, 7],
+    major: [0, 4, 7],
+    suspended: [0, 5, 7]
+};
+var EXTENSION_INTERVALS = {
+    sixth: 9,
+    minor_seventh: 10,
+    major_seventh: 11,
+    ninth: 14
+};
+var EXTENSION_ORDER = ["sixth", "minor_seventh", "major_seventh", "ninth"];
 
 function assertIntegerInRange(value, minimum, maximum, name) {
     if (typeof value !== "number" || value % 1 !== 0 || value < minimum || value > maximum) {
@@ -60,21 +67,21 @@ function degreeRoot(rootNote, intervals, baseOctave, degree) {
     return scaleDegreePitch(rootNote, intervals, baseOctave, degree - 1);
 }
 
-function chordPitches(rootPitch, quality, seventhEnabled, ninthEnabled) {
-    if (rootPitch === null) {
-        return [];
-    }
+function normalizedPitches(pitches) {
+    var seen = {};
+    var result = [];
+    pitches.forEach(function (pitch) {
+        assertIntegerInRange(pitch, 0, MIDI_MAX_PITCH, "pitch");
+        if (!seen[pitch]) {
+            seen[pitch] = true;
+            result.push(pitch);
+        }
+    });
+    return result.sort(function (left, right) { return left - right; });
+}
+
+function pitchesForIntervals(rootPitch, intervals) {
     assertIntegerInRange(rootPitch, 0, MIDI_MAX_PITCH, "chord root");
-    if (!Object.prototype.hasOwnProperty.call(QUALITY_INTERVALS, quality)) {
-        throw new RangeError("unknown chord quality: " + quality);
-    }
-    var intervals = QUALITY_INTERVALS[quality].slice();
-    if (seventhEnabled) {
-        intervals.push(10);
-    }
-    if (ninthEnabled) {
-        intervals.push(14);
-    }
     return intervals.map(function (interval) {
         return rootPitch + interval;
     }).filter(function (pitch) {
@@ -82,10 +89,113 @@ function chordPitches(rootPitch, quality, seventhEnabled, ninthEnabled) {
     });
 }
 
+function qualityChordPitches(rootPitch, chordType) {
+    if (!CHORD_INTERVALS[chordType]) {
+        throw new RangeError("chord type must be diminished, minor, major, or suspended");
+    }
+    return pitchesForIntervals(rootPitch, CHORD_INTERVALS[chordType]);
+}
+
+function diatonicChordPitches(rootNote, intervals, baseOctave, row, degree) {
+    var normalized = validateScaleIntervals(intervals);
+    assertIntegerInRange(row, 1, 4, "chord row");
+    assertIntegerInRange(degree, 1, 8, "degree");
+    var anchorIndex = degree === 8 ? normalized.length : degree - 1;
+    return [0, 2, 4].map(function (offset) {
+        var pitch = scaleDegreePitch(rootNote, normalized, baseOctave, anchorIndex + offset);
+        return pitch === null ? null : pitch + (row - 1) * 12;
+    }).filter(function (pitch) {
+        return pitch !== null && pitch <= MIDI_MAX_PITCH;
+    });
+}
+
+function addExtensions(pitches, rootPitch, extensions) {
+    var result = pitches.slice();
+    EXTENSION_ORDER.forEach(function (extension) {
+        var pitch;
+        if (extensions[extension]) {
+            pitch = rootPitch + EXTENSION_INTERVALS[extension];
+            if (pitch <= MIDI_MAX_PITCH) {
+                result.push(pitch);
+            }
+        }
+    });
+    return normalizedPitches(result);
+}
+
+function applyVoicing(pitches, steps) {
+    assertIntegerInRange(steps, -16, 16, "voicing");
+    var result = normalizedPitches(pitches);
+    var shifted;
+    var remaining = Math.abs(steps);
+    while (remaining > 0 && result.length > 0) {
+        if (steps > 0) {
+            shifted = result.shift() + 12;
+            if (shifted > MIDI_MAX_PITCH) {
+                result.unshift(shifted - 12);
+                break;
+            }
+            result.push(shifted);
+        } else {
+            shifted = result.pop() - 12;
+            if (shifted < 0) {
+                result.push(shifted + 12);
+                break;
+            }
+            result.push(shifted);
+        }
+        result = normalizedPitches(result);
+        remaining -= 1;
+    }
+    return result;
+}
+
+function addBass(pitches, rootPitch, enabled, bassOctave) {
+    assertIntegerInRange(bassOctave, -4, 1, "bass octave");
+    var result = pitches.slice();
+    var pitch = rootPitch + bassOctave * 12;
+    if (enabled && pitch >= 0 && pitch <= MIDI_MAX_PITCH) {
+        result.push(pitch);
+    }
+    return normalizedPitches(result);
+}
+
+function orchidChordPitches(
+    rootNote,
+    intervals,
+    baseOctave,
+    row,
+    degree,
+    chordType,
+    extensions,
+    voicing,
+    bassEnabled,
+    bassOctave
+) {
+    assertIntegerInRange(row, 1, 4, "chord row");
+    var baseRoot = degreeRoot(rootNote, intervals, baseOctave, degree);
+    var rootPitch = baseRoot === null ? null : baseRoot + (row - 1) * 12;
+    if (rootPitch === null || rootPitch > MIDI_MAX_PITCH) {
+        return [];
+    }
+    var pitches = chordType === "auto" ?
+        diatonicChordPitches(rootNote, intervals, baseOctave, row, degree) :
+        qualityChordPitches(rootPitch, chordType);
+    pitches = addExtensions(pitches, rootPitch, extensions);
+    pitches = applyVoicing(pitches, voicing);
+    return addBass(pitches, rootPitch, bassEnabled, bassOctave);
+}
+
 var harmony = {
-    QUALITY_INTERVALS: QUALITY_INTERVALS,
-    chordPitches: chordPitches,
+    EXTENSION_ORDER: EXTENSION_ORDER,
+    addBass: addBass,
+    addExtensions: addExtensions,
+    applyVoicing: applyVoicing,
     degreeRoot: degreeRoot,
+    diatonicChordPitches: diatonicChordPitches,
+    normalizedPitches: normalizedPitches,
+    orchidChordPitches: orchidChordPitches,
+    qualityChordPitches: qualityChordPitches,
     scaleDegreePitch: scaleDegreePitch,
     tonicPitch: tonicPitch,
     validateScaleIntervals: validateScaleIntervals

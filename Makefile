@@ -4,7 +4,7 @@ VENV_PYTHON := $(VENV)/bin/python
 VENV_PIP := $(VENV)/bin/pip
 ARTIFACT := dist/PushChordGrid.amxd
 MANIFEST := dist/manifest.json
-PACKAGE := dist/PushChordGrid-WP2.zip
+PACKAGE := dist/PushChordGrid-WP4.zip
 
 .PHONY: bootstrap test build validate package clean
 

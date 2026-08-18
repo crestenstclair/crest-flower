@@ -1,14 +1,36 @@
 # Push Chord Grid
 
 Push Chord Grid is a generated Max for Live MIDI Effect targeting Ableton Live 12 and
-Push 3 Standalone. WP1–WP3 are accepted. The WP2 artifact dynamically discovers Push,
-owns its 8×8 pad matrix only while this device's track is selected, and reports every
-pad as an A1–H8 coordinate. The WP3 source adds the fully tested, Push-independent
-musical engine that WP4 will integrate into that artifact.
+Push 3 Standalone. WP1–WP4 are accepted. The WP4 build combines the
+proven Push matrix adapter with the deterministic musical engine and emits generated
+MIDI for a downstream instrument or recording track.
 
-The current artifact does not yet generate chords or notes. Incoming track MIDI still
-passes through unchanged, while grabbed Push pad events are shown on the device face.
-Push Standalone testing remains deferred to WP6 by user decision.
+The 8×8 surface has exactly one role per coordinate: ranks 1–4 each play scale-degree
+chords 1–8, with every higher rank one octave above the last. Live's current root and
+scale automatically determine every default chord quality and pitch. Inspired by
+Telepathic Instruments Orchid, A8–D8 momentarily override Dim/Min/Maj/Sus, E8–H8 add
+independent 6/m7/M7/9 notes, and rank 7 controls inversion and an optional root bass
+voice.
+Held pads retain exact pitch snapshots; shared pitches are reference-counted; focus,
+disable, and deletion lifecycles flush active notes plus CC123.
+
+Version 0.4.4 correlates each lower-half physical Push pad's raw strike velocity with
+its matrix coordinate before generating a chord. Every note in that chord receives
+the pad velocity; the matrix callback remains a safe fallback, and external MIDI
+continues through unchanged.
+
+Version 0.4.5 makes grid recovery explicit. Re-enabling the device automatically
+rediscovers Push before reacquisition, and the device face includes a **Reload Grid**
+button that safely flushes notes, releases stale ownership, rediscovers the matrix,
+reacquires it, and repaints the complete LED frame.
+
+The owned grid is state-lit: active modifiers, voicing, and bass state use an accent;
+chord pads share a blue family with distinct tonics; held musical pads turn white; and
+reserved pads remain off. Rendering sends one complete frame after
+matrix acquisition, then only changed pads, and clears device colors before release.
+
+Push Standalone testing remains deferred to WP6 by user decision. WP4 uses only native
+Max, Max `js`, and the public Live Object Model, preserving standalone compatibility.
 
 ## Build
 
@@ -25,29 +47,46 @@ make package
 
 Outputs:
 
-- `dist/PushChordGrid.amxd` — self-contained WP2 matrix-spike device
+- `dist/PushChordGrid.amxd` — self-contained WP4 integration device
 - `dist/manifest.json` — deterministic artifact metadata and checksum
-- `dist/PushChordGrid-WP2.zip` — ready-to-test bundle
+- `dist/PushChordGrid-WP4.zip` — ready-to-install hardware-test bundle
 
-## WP2 hardware test
+Open the self-contained [usage and proposed-feature guide](docs/USAGE_GUIDE.html) in a
+browser for the interactive 8×8 map, concrete chord examples, current controls, and
+the scoped follow-up roadmap. The release bundle includes that guide, the exact
+hardware card, and the [Orchid capability/adaptation study](docs/ORCHID_ADAPTATION.md).
+The official public manual snapshot retained for research reproducibility is not a
+runtime dependency.
 
-1. In Live 12 with Push in Control Mode, load the device and select its track. Expect
-   `Status: matrix acquired` on the device.
-2. Press the four physical corner pads. Expect bottom-left A1, bottom-right H1,
-   top-left A8, and top-right H8; releases report velocity 0.
-3. Complete the focus, disable/re-enable, and Set-reload checks in
-   `docs/HARDWARE_TESTS.md`.
+Strum and Arp are intentionally handled by downstream Ableton MIDI devices rather than
+embedded here. Push Chord Grid owns harmony, extensions, voicing, and bass; Live's
+composable MIDI-effect chain owns timed transformations.
 
-Record the exact result in `docs/HARDWARE_TESTS.md`. Do not edit the device in Max.
+The local acceptance workspace also contains the MCP-created
+`dist/PushChordGrid-WP1-Test Project/PushChordGrid-WP4-Test.als` with the source,
+Post-FX recording route, and Drift destination. It is test evidence, not a reproducible
+release artifact produced by `make`.
+
+## WP4 hardware evidence
+
+The MCP-configured test Set already contains the installed device on **WP4 Grid
+Source** and an armed **WP4 Grid Record** track fed from Post FX with Drift. The agent
+installed v0.4.5 and completed Live-side scale, focus, routing, automatic
+disable/re-enable recovery, and manual Reload Grid checks. The device returned to
+`Status: matrix acquired` after both recovery paths. The user confirmed the complete
+musical interaction before reporting the now-corrected dark-grid recovery defect.
 
 ## Status
 
-WP2 was accepted on 2026-08-17. Its automated gate covers all 64 coordinate mappings,
-ownership-state logic, container and patch graph, embedded JavaScript completeness,
-forbidden-object policy, manifest checksum, and byte-for-byte reproducibility. The
-connected Push 3 hardware gate confirmed A1, H1, A8, and H8 plus lifecycle reacquisition.
+WP4's automated gate covers every coordinate role, no-trigger controls/reserved pads,
+automatic and manual chord golden vectors, all four Orchid extensions, inversion,
+bass, note ownership and lifecycle flushes, Live scale callback normalization, frozen
+artifact structure, forbidden dependencies, manifest completeness, and byte-for-byte
+reproducibility.
 
-WP3 was accepted on 2026-08-17 without a hardware gate. Golden vectors cover C major,
-E natural minor, and D Dorian, while enforced 100% deterministic-core branch coverage
-proves qualities/extensions, degree 8, three-row layout, velocity, overlap/reference
-counts, exact release, retrigger, and all-notes-off lifecycle behavior. WP4 has not begun.
+WP4 was accepted on 2026-08-17 after the user confirmed the hardware interaction works
+great. Version 0.4.1 added the requested LED renderer, 0.4.2 added the four-row
+automatic diatonic chord layout, and 0.4.3 adds the Orchid harmonic surface without
+beginning WP5. Version 0.4.4 fixes physical chord-pad velocity propagation and records
+the proposed harmonic feature set as approved direction. Version 0.4.5 adds automatic
+and manual grid recovery without implementing WP5.

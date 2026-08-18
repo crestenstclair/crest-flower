@@ -8,6 +8,7 @@ var FLUSH_LIFECYCLES = {
     panic: true,
     focus_lost: true,
     disabled: true,
+    reload: true,
     deleted: true,
     set_closed: true
 };
