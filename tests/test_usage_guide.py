@@ -44,11 +44,14 @@ def test_usage_guide_is_complete_offline_and_coordinate_exact() -> None:
     assert parser.scripts == 1
     assert {"start", "grid", "usage", "next", "boundary"} <= set(parser.ids)
     assert "No embedded Strum or Arp" in source
-    assert "Proposed next features" in source
+    assert "Shipped + roadmap" in source
     assert "Your strike shapes the whole chord" in source
-    assert "Approved · P1" in source
-    assert "v0.4.5" in source
+    assert "Implemented · 0.4.6" in source
+    assert "v0.4.7" in source
     assert "Reload Grid" in source
+    assert "Scale C Minor | Chord: Auto | Voice 0 | Nearest on | Bass off | Ext 9" in source
+    assert "Last: Fm | Quality Min | Ext 9 | Inv VL -1" in source
+    assert "Changing Voice, Live’s scale, Base Octave, Nearest mode, or lifecycle focus clears history" in source
     assert "The page is explanatory only; it does not send MIDI." in source
 
 
@@ -67,7 +70,7 @@ def test_usage_guide_documents_current_control_roles() -> None:
         "A7": "Voice down",
         "B7": "Voice reset",
         "C7": "Voice up",
-        "D7": "Reserved",
+        "D7": "Nearest voice leading",
         "E7": "Bass down",
         "F7": "Bass reset",
         "G7": "Bass up",
@@ -76,4 +79,5 @@ def test_usage_guide_documents_current_control_roles() -> None:
         assert f'data-coordinate="{coordinate}" data-role="{role}"' in source
 
     assert source.count('data-kind="chord"') == 32
-    assert source.count('data-kind="reserved"') == 17
+    assert source.count('data-kind="reserved"') == 16
+    assert source.count('data-kind="voiceleading"') == 1

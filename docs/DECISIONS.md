@@ -268,3 +268,37 @@
 - **State:** Reload clears momentary quality/extension holds through the lifecycle
   path, preserves persistent voicing/bass state, and emits no musical trigger.
 - **Scope:** Version 0.4.5 WP4 recovery correction; WP5 remains unstarted.
+
+## 2026-08-18 — nearest voice leading and emitted-snapshot feedback
+
+- **Authorization:** After reviewing the next roadmap step, the user explicitly asked
+  the agent to implement v0.4.6 before WP5 hardening.
+- **Control:** D7 is no longer reserved. It is a persistent, edge-triggered Nearest
+  toggle; press/release emits no MIDI, repeated pressure cannot double-toggle, and its
+  LED uses note color `2` when off and active accent `13` when on.
+- **Algorithm:** Candidate inversions are limited to one complete rotation around the
+  pressed row and manual Voice baseline. Symmetric nearest-tone distance includes all
+  prior/current chord tones; score ties prefer the smallest absolute adjustment and
+  then the lower signed adjustment. Bass never participates in scoring.
+- **History:** Mode, manual Voice, Live scale, Base Octave, and lifecycle changes clear
+  prior-chord history. Sounding owners remain exact snapshots; ordinary release does
+  not erase performance history.
+- **Feedback:** A dedicated device line derives chord root/name, resolved quality,
+  extensions, inversion decision, and note-name/MIDI-number list from the exact owner
+  snapshot, including shared pitches that did not need a repeated note-on.
+- **Scope:** Version 0.4.6 implements only approved Nearest and feedback work on WP4.
+  Advanced holds, Secret Chords, performance snapshots, split output, WP5, and WP6
+  remain unstarted.
+
+## 2026-08-18 — normalize live scale observer callbacks
+
+- **Trigger:** Live reported C Minor after a post-load scale change, but the device
+  continued using its previous interval snapshot.
+- **Cause:** LiveAPI observer callbacks arrive as one array argument. The adapter's
+  initial-query path handled arrays, but its change callbacks treated that array as
+  multiple arguments and rejected the resulting interval parse.
+- **Decision:** Normalize both single-array observer callbacks and direct initial
+  values at the adapter boundary, golden-test the production callback shape, and show
+  `Scale <root> <name>` on the current-state line.
+- **Scope:** Version 0.4.7 WP4 correction; musical generation, active-note ownership,
+  Standalone constraints, and WP5 scope are unchanged.

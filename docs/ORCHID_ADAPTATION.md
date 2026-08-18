@@ -1,7 +1,7 @@
 # Orchid capability study and Push adaptation
 
 Research date: 2026-08-17  
-Implemented slice: Push Chord Grid v0.4.5
+Implemented slice: Push Chord Grid v0.4.7
 
 ## Source record
 
@@ -57,7 +57,8 @@ copying Orchid's enclosure, synth presets, or menu structure.
 | Key Mode | All 32 musical pads derive degrees 1–8 from Live's current root and scale | Implemented |
 | Manual Dim/Min/Maj/Sus | Momentary quality overrides on A8–D8; release returns to Auto | Implemented |
 | 6/m7/M7/9 extensions | Independent momentary modifiers on E8–H8; combinations are additive | Implemented |
-| Chord voicing dial | A7/B7/C7 move down/reset/up one inversion step | Implemented |
+| Chord voicing dial | A7/B7/C7 move down/reset/up; D7 toggles deterministic Nearest mode | Implemented |
+| Chord feedback | Device face names the chord, quality/extensions, inversion, and exact MIDI snapshot | Implemented |
 | Bass engine and voicing | H7 adds a root bass voice; E7/F7/G7 move down/reset/up by octave | Implemented as MIDI; sound comes from Live |
 | Simple playstyle | Chord pitch snapshot is fixed at note-on and modifiers affect future chords | Implemented |
 | Advanced/Free playstyles | Safe live mutation of held owners without duplicate or stuck notes | Proposed follow-up; Simple remains default |
@@ -83,34 +84,44 @@ the downstream Live workflow exposes a concrete missing capability. This boundar
 keeps the snapshot/reference-count engine exact and lets performers choose or replace
 their timing layer independently of the harmony engine.
 
-## Proposed follow-ups
+## Implemented v0.4.6 follow-up
 
-The user approved this proposal set as product direction. It is intentionally harmonic
-rather than rhythmic and remains unimplemented until separately requested:
+D7 now toggles Nearest mode. The first chord establishes history; each later press
+chooses the lowest-scoring inversion within one rotation of that pad's row and manual
+Voice baseline. Scoring is symmetric across every prior and candidate chord tone,
+bass is excluded, and ties prefer the smallest adjustment then the lower signed step.
+The device face shows the resolved chord, extensions, inversion decision, and exact
+emitted note-name/MIDI-number snapshot. Sounding owners retain Simple semantics.
 
-1. Add a nearest-voice-leading mode that chooses the inversion requiring the least
-   movement from the previous chord.
-2. Add an opt-in Advanced hold behavior that safely applies quality or extension
+Version 0.4.7 corrects post-load Live scale observation by normalizing LiveAPI's
+single-array callback shape. The current-state line now names the detected Live scale,
+so automatic Key Mode changes are visible before the next chord press.
+
+## Remaining proposed follow-ups
+
+The user approved this remaining proposal set as product direction. It is intentionally
+harmonic rather than rhythmic and remains unimplemented until separately requested:
+
+1. Add an opt-in Advanced hold behavior that safely applies quality or extension
    changes to sounding chords while Simple snapshot behavior remains the default.
-3. Use a deliberate layer of reserved pads for Secret Chords such as augmented,
+2. Use a deliberate layer of reserved pads for Secret Chords such as augmented,
    power, quartal, minor-major, and dominant colors.
-4. Explore recallable performance snapshots for voicing, bass register, and extension
+3. Explore recallable performance snapshots for voicing, bass register, and extension
    state.
-5. Explore Standalone-compatible separation of bass and chord MIDI paths.
-6. Improve visible chord-name, extension, inversion, and emitted-pitch feedback.
+4. Explore Standalone-compatible separation of bass and chord MIDI paths.
 
 Possible pad placements are design notes, not assigned coordinate roles. Reserved pads
 remain silent until a proposal is accepted, implemented, documented, and covered by
 the full automated and hardware gates.
 
-## Exact v0.4.3 grid
+## Exact v0.4.7 grid
 
 Push coordinates use chess notation: A1 is bottom-left and H8 is top-right.
 
 | Rank | A | B | C | D | E | F | G | H |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 8 | Dim | Min | Maj | Sus | 6 | m7 | M7 | 9 |
-| 7 | Voice − | Voice 0 | Voice + | Reserved | Bass − | Bass −1 | Bass + | Bass on/off |
+| 7 | Voice − | Voice 0 | Voice + | Nearest | Bass − | Bass −1 | Bass + | Bass on/off |
 | 6 | Reserved | Reserved | Reserved | Reserved | Reserved | Reserved | Reserved | Reserved |
 | 5 | Reserved | Reserved | Reserved | Reserved | Reserved | Reserved | Reserved | Reserved |
 | 4 | Degree 1 +36 | 2 +36 | 3 +36 | 4 +36 | 5 +36 | 6 +36 | 7 +36 | 8 +36 |
@@ -120,7 +131,8 @@ Push coordinates use chess notation: A1 is bottom-left and H8 is top-right.
 
 “Bass −1” resets the bass to one octave below the chord root. Bass − and Bass + step
 the bass register within −4 to +1 octaves. The chord voicing range is −16 to +16 tone
-moves. Both settings persist across focus changes. Chord-type and extension pads are
+ moves. Voice, Nearest mode, and bass settings persist across focus changes.
+Chord-type and extension pads are
 momentary and are cleared on ownership loss so a modifier cannot become stuck.
 
 ## Harmonic rules
@@ -155,7 +167,7 @@ root and follows its own octave state.
 - Shared pitches use reference counts and are released only by the final owner.
 - Focus loss, disable, deletion, and Set close flush exact note-offs plus CC123.
 - Momentary modifiers clear on lifecycle loss; persistent voicing and bass selections
-  remain.
+  remain. Nearest mode remains enabled but its prior-chord history clears.
 - Runtime dependencies remain Max-native objects, Max `js`, and the public Live Object
   Model. The downloaded manual snapshot and all development tooling stay outside the
   artifact.

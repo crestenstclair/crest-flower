@@ -15,6 +15,9 @@ device provides:
 - momentary Dim/Min/Maj/Sus quality overrides;
 - independent momentary 6/m7/M7/9 extensions;
 - persistent chord voicing and optional root bass with an independent register;
+- persistent D7 Nearest mode with bass-independent deterministic inversion scoring;
+- exact last-chord identity, inversion, extension, and emitted-pitch feedback;
+- visible detected Live root/scale feedback on the current-state line;
 - exact input-velocity propagation;
 - held-pad pitch snapshots and shared-pitch reference counting;
 - exact release plus CC123 flushing for panic and every ownership-loss lifecycle;
@@ -48,8 +51,8 @@ The generated artifact is a Max for Live MIDI Effect with:
 - delayed acquire, automatic rediscovery after re-enable, and a one-second watchdog
   for focus and Set reload;
 - physical matrix normalization where bottom-left is A1 and top-right is H8;
-- visible last-pad, lifecycle, and chord-selection status on the device face;
-- 15 silent harmonic/voicing/bass controls, 17 silent reserved pads, and 32 chord pads
+- visible last-pad, lifecycle, current-selection, and last-chord status on the device face;
+- 16 silent harmonic/voicing/nearest/bass controls, 16 silent reserved pads, and 32 chord pads
   with exactly one documented role per coordinate;
 - a complete LED repaint after acquisition, changed-pad updates during use, and an LED
   clear before matrix release; and
@@ -89,3 +92,7 @@ area with four automatic diatonic chord octaves. Version 0.4.3 adds Orchid-inspi
 quality, extension, inversion, and bass behavior. Version 0.4.4 corrects physical
 chord-pad velocity propagation. Version 0.4.5 adds automatic re-enable rediscovery and
 manual Reload Grid recovery. WP5 has not begun.
+Version 0.4.6 assigns D7 to Nearest voice leading and adds exact emitted-snapshot
+feedback. WP5 has not begun.
+Version 0.4.7 corrects array-wrapped Live scale observer updates and makes the detected
+scale visible. WP5 has not begun.

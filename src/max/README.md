@@ -11,11 +11,15 @@ Device enablement also triggers fresh native discovery. The momentary **Reload G
 control sends a safe reload lifecycle, releases stale ownership, rediscovers Push and
 `Button_Matrix`, then reacquires and schedules a complete LED repaint.
 
-`live-scale-adapter.js` observes the four Live Set scale properties.
+`live-scale-adapter.js` observes the four Live Set scale properties, normalizes both
+initial values and LiveAPI's array-wrapped change callbacks, and forwards complete
+root/interval snapshots.
 `runtime-adapter.js` assigns every coordinate one role, implements Orchid-style
 momentary qualities/extensions plus persistent voicing/bass controls, consumes every
 control/reserved pad, and connects musical pads to the WP3 snapshot/reference-count
-engine. Its note and CC events are formatted by native Max objects. The same adapter
+engine. D7 is an edge-safe Nearest toggle, and the adapter formats current settings
+plus the exact last generated chord snapshot on separate device-face lines. Its note
+and CC events are formatted by native Max objects. The same adapter
 derives a 64-pad LED frame from musical state and held owners, caches the last color
 per coordinate, and emits only differences after its acquisition repaint. The native
 bridge converts each `x y color` list to `call send_value x y color` on

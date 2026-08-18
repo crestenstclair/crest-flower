@@ -113,6 +113,41 @@ test("voicing walks the lowest or highest chord tone by exact octaves", () => {
     assert.deepEqual(harmony.normalizedPitches([64, 60, 64]), [60, 64]);
 });
 
+test("nearest voicing searches one rotation and uses deterministic symmetric scoring", () => {
+    assert.deepEqual(harmony.nearestVoicing([65, 69, 72], [60, 64, 67]), {
+        pitches: [60, 65, 69], adjustment: -1, score: 6
+    });
+    assert.deepEqual(harmony.nearestVoicing([67, 71, 74], [60, 64, 67]), {
+        pitches: [59, 62, 67], adjustment: -2, score: 6
+    });
+    assert.deepEqual(harmony.nearestVoicing([62, 65, 69, 72], [60, 64, 67]), {
+        pitches: [60, 62, 65, 69], adjustment: -1, score: 8
+    });
+    assert.equal(harmony.symmetricVoiceLeadingDistance([60, 65, 69], [60, 64, 67]), 6);
+    assert.equal(harmony.symmetricVoiceLeadingDistance([], [60]), 0);
+    assert.deepEqual(harmony.nearestVoicing([], [60]), {
+        pitches: [], adjustment: 0, score: 0
+    });
+    assert.deepEqual(harmony.nearestVoicing([60, 64, 67], []), {
+        pitches: [60, 64, 67], adjustment: 0, score: 0
+    });
+});
+
+test("nearest voicing removes boundary duplicates and applies stable tie breaks", () => {
+    assert.deepEqual(harmony.nearestVoicing([120, 124, 127], [119, 123, 127]), {
+        pitches: [120, 124, 127], adjustment: 0, score: 4
+    });
+    assert.deepEqual(harmony.nearestVoicing([60], [72]), {
+        pitches: [60], adjustment: 0, score: 24
+    });
+    assert.deepEqual(harmony.nearestVoicing([60, 72], [66]), {
+        pitches: [60, 72], adjustment: 0, score: 18
+    });
+    assert.deepEqual(harmony.nearestVoicing([48, 55, 58], [48, 51, 56]), {
+        pitches: [48, 55, 58], adjustment: 0, score: 7
+    });
+});
+
 test("state controls affect future chords and lifecycle reset preserves persistent choices", () => {
     const state = musicalState.createState();
     assert.deepEqual(state, {
@@ -124,6 +159,8 @@ test("state controls affect future chords and lifecycle reset preserves persiste
             ninth: false
         },
         voicing: 0,
+        voiceLeadingEnabled: false,
+        voiceLeadingPitches: [],
         bassEnabled: false,
         bassOctave: -1,
         rootNote: 0,
@@ -151,6 +188,7 @@ test("state controls affect future chords and lifecycle reset preserves persiste
         ninth: false
     });
     assert.equal(state.voicing, 1);
+    assert.deepEqual(state.voiceLeadingPitches, []);
     assert.equal(state.bassEnabled, true);
     assert.equal(state.bassOctave, -2);
 
@@ -163,6 +201,81 @@ test("state controls affect future chords and lifecycle reset preserves persiste
     musicalState.setBassOctave(state, -4);
     assert.equal(musicalState.shiftBassOctave(state, -1), -4);
     assert.equal(musicalState.toggleBass(state), false);
+});
+
+test("nearest voice leading is opt-in, stateful, and publishes exact chord snapshots", () => {
+    const state = musicalState.createState();
+    assert.equal(musicalState.toggleVoiceLeading(state), true);
+    const tonic = musicalState.chordSnapshotForPad(state, 1, 1);
+    assert.deepEqual(tonic, {
+        rootPitch: 60,
+        requestedQuality: "auto",
+        resolvedQuality: "major",
+        extensions: [],
+        manualVoicing: 0,
+        voiceLeadingEnabled: true,
+        nearestAdjustment: 0,
+        nearestScore: 0,
+        chordPitches: [60, 64, 67],
+        pitches: [60, 64, 67]
+    });
+    const subdominant = musicalState.chordSnapshotForPad(state, 1, 4);
+    assert.deepEqual(subdominant.chordPitches, [60, 65, 69]);
+    assert.equal(subdominant.resolvedQuality, "major");
+    assert.equal(subdominant.nearestAdjustment, -1);
+    assert.equal(subdominant.nearestScore, 6);
+    assert.deepEqual(state.voiceLeadingPitches, [60, 65, 69]);
+    assert.equal(musicalState.toggleVoiceLeading(state), false);
+    assert.deepEqual(state.voiceLeadingPitches, []);
+    assert.deepEqual(musicalState.chordForPad(state, 1, 4), [65, 69, 72]);
+});
+
+test("nearest history ignores bass and handles extension cardinality changes", () => {
+    const state = musicalState.createState();
+    musicalState.toggleVoiceLeading(state);
+    musicalState.chordSnapshotForPad(state, 1, 1);
+    musicalState.setExtension(state, "ninth", true);
+    musicalState.toggleBass(state);
+    musicalState.setBassOctave(state, -2);
+    const extended = musicalState.chordSnapshotForPad(state, 1, 2);
+    assert.deepEqual(extended.chordPitches, [62, 64, 65, 69]);
+    assert.deepEqual(extended.pitches, [38, 62, 64, 65, 69]);
+    assert.equal(extended.nearestAdjustment, -1);
+    assert.equal(extended.nearestScore, 9);
+    assert.equal(extended.resolvedQuality, "minor");
+    assert.deepEqual(extended.extensions, ["ninth"]);
+});
+
+test("voice-leading history clears at every declared context boundary", () => {
+    const state = musicalState.createState();
+    musicalState.toggleVoiceLeading(state);
+    musicalState.chordForPad(state, 1, 1);
+    assert.notDeepEqual(state.voiceLeadingPitches, []);
+    musicalState.setVoicing(state, 1);
+    assert.deepEqual(state.voiceLeadingPitches, []);
+    musicalState.chordForPad(state, 1, 1);
+    musicalState.updateScale(state, 9, [0, 2, 3, 5, 7, 8, 10]);
+    assert.deepEqual(state.voiceLeadingPitches, []);
+    musicalState.chordForPad(state, 1, 1);
+    musicalState.updateBaseOctave(state, 2);
+    assert.deepEqual(state.voiceLeadingPitches, []);
+    musicalState.chordForPad(state, 1, 1);
+    musicalState.resetMomentaryModifiers(state);
+    assert.deepEqual(state.voiceLeadingPitches, []);
+    assert.equal(state.voiceLeadingEnabled, true);
+});
+
+test("snapshot quality resolves automatic and manual chord identities", () => {
+    const state = musicalState.createState();
+    assert.equal(musicalState.chordSnapshotForPad(state, 1, 2).resolvedQuality, "minor");
+    assert.equal(musicalState.chordSnapshotForPad(state, 1, 7).resolvedQuality, "diminished");
+    musicalState.setChordType(state, "suspended");
+    assert.equal(musicalState.chordSnapshotForPad(state, 1, 1).resolvedQuality, "suspended");
+    musicalState.updateScale(state, 0, [0, 1]);
+    musicalState.setChordType(state, "auto");
+    assert.equal(musicalState.chordSnapshotForPad(state, 1, 1).resolvedQuality, "auto");
+    musicalState.updateScale(state, 0, [0, 1, 5, 6, 7]);
+    assert.equal(musicalState.chordSnapshotForPad(state, 1, 1).resolvedQuality, "suspended");
 });
 
 test("scale and octave updates affect future chord rows", () => {
@@ -314,6 +427,66 @@ test("out-of-range high notes return no MIDI pitch", () => {
             [0, 2, 4, 5, 7, 9, 11],
             8,
             2,
+            1,
+            "auto",
+            {sixth: false, minor_seventh: false, major_seventh: false, ninth: false},
+            0,
+            false,
+            -1
+        ),
+        []
+    );
+    assert.deepEqual(
+        harmony.orchidChordPitches(
+            11,
+            [0],
+            8,
+            1,
+            8,
+            "auto",
+            {sixth: false, minor_seventh: false, major_seventh: false, ninth: false},
+            0,
+            false,
+            -1
+        ),
+        []
+    );
+    assert.deepEqual(
+        harmony.orchidChordPitches(
+            0,
+            [0, 2, 4, 5, 7, 9, 11],
+            3,
+            1,
+            1,
+            "minor",
+            {sixth: false, minor_seventh: false, major_seventh: false, ninth: false},
+            0,
+            false,
+            -1
+        ),
+        [60, 63, 67]
+    );
+    assert.deepEqual(
+        harmony.orchidChordPitches(
+            0,
+            [0, 2, 4, 5, 7, 9, 11],
+            3,
+            1,
+            1,
+            "auto",
+            {sixth: false, minor_seventh: false, major_seventh: false, ninth: false},
+            0,
+            false,
+            -1
+        ),
+        [60, 64, 67]
+    );
+    assert.deepEqual(
+        harmony.orchidChordPitches(
+            0,
+            [0, 2, 4, 5, 7, 9, 11],
+            7,
+            4,
             1,
             "auto",
             {sixth: false, minor_seventh: false, major_seventh: false, ninth: false},

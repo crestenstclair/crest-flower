@@ -1,4 +1,4 @@
-# WP4 v0.4.5 velocity and grid-recovery hardware acceptance card
+# WP4 v0.4.7 live-scale, Nearest, and chord-feedback hardware acceptance card
 
 Artifact: `dist/PushChordGrid.amxd`
 
@@ -8,8 +8,9 @@ Package: `dist/PushChordGrid-WP4.zip`
 
 WP4's original interaction, v0.4.2 four-row automatic harmony, and v0.4.3 Orchid
 surface are accepted. This card retains the v0.4.4 physical chord-pad velocity
-correction and adds v0.4.5 automatic/manual matrix recovery. Push Standalone remains
-deferred by user decision.
+correction and v0.4.5 matrix recovery, then adds v0.4.6 D7 Nearest voice leading and
+exact chord feedback. Version 0.4.7 corrects post-load Live scale observation and
+makes the detected scale visible. Push Standalone remains deferred by user decision.
 
 ## Agent-executed MCP setup
 
@@ -21,7 +22,8 @@ is physical Push pad contact.
 Expected device state after load:
 
 - `Status: matrix acquired`
-- `Chord: Auto | Voice 0 | Bass off | Ext -`
+- `Scale C Major | Chord: Auto | Voice 0 | Nearest off | Bass off | Ext -`
+- `Last: --`
 - Base Octave `3`
 
 On 2026-08-17 the agent installed the byte-identical v0.4.3 artifact in the User
@@ -42,6 +44,16 @@ Drift. The agent switched Device On to Off and observed `Status: device disabled
 switched it back On and observed `Status: matrix acquired`, then clicked **Reload
 Grid** and again observed `Status: matrix acquired` without reloading the Set.
 
+For v0.4.6 the agent owns artifact installation, the cleaned three-track Set, scale and
+focus changes, Device On/Reload cycling, routing, Set saving, UI inspection, and
+recorded-note inspection. The three intentional tracks are **Producer Pal Control**,
+**Push Chord Grid**, and armed **Chord Recorder + Drift** fed from Post FX. Only
+physical Push pad contact and hardware power cycling remain unavailable to MCP.
+
+For v0.4.7 the agent additionally owns changing Live from C Major to C Minor after the
+device has initialized and verifying that the device face changes to `Scale C Minor`
+without a reload. The physical chord strike remains the only hardware-only part.
+
 ## 1. Coordinate roles and silent controls
 
 Ranks 1–4 are chords. A–H are degrees 1–8; ranks 1–4 add 0/12/24/36 semitones.
@@ -56,10 +68,10 @@ Rank 7 is voicing and bass:
 
 | Pad | A7 | B7 | C7 | D7 | E7 | F7 | G7 | H7 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Role | Voice − | Voice 0 | Voice + | Reserved | Bass − | Bass −1 | Bass + | Bass toggle |
+| Role | Voice − | Voice 0 | Voice + | Nearest | Bass − | Bass −1 | Bass + | Bass toggle |
 
-Ranks 5–6 and D7 are reserved. Every control and reserved pad is absent from the
-recorded MIDI as a note-on. Quality and extension controls are momentary; voicing and
+Ranks 5–6 are reserved. Every control and reserved pad is absent from the recorded
+MIDI as a note-on. Quality and extension controls are momentary; Voice, Nearest, and
 bass state persist.
 
 Result: `[ ] PASS  [ ] FAIL`
@@ -86,6 +98,16 @@ unchanged shared-pitch ownership.
 Result: `[ ] PASS  [ ] FAIL`
 
 ## 3. Automatic Key Mode
+
+After the device is initialized in C Major, change Live to C Minor without reloading
+the device. The current-state line must change from `Scale C Major` to `Scale C Minor`.
+At Base Octave 3, A1 must then record C minor as `60 63 67`; it must not retain the
+previous C-major vector `60 64 67`. Changing back to C Major must restore `60 64 67`.
+
+The automated gate supplies LiveAPI's actual single-array callback shape and proves
+the C Minor interval snapshot `0 2 3 5 7 8 10` reaches the runtime adapter.
+
+Result: `[ ] PASS  [ ] FAIL`
 
 With A Natural Minor selected in Live, Base Octave 3, and no modifier held, rank 1 must
 record:
@@ -159,7 +181,35 @@ display reports the exact Voice and Bass values. H7 turns bass off again.
 
 Result: `[ ] PASS  [ ] FAIL`
 
-## 7. Snapshot, overlap, and lifecycle
+## 7. Nearest voice leading and exact feedback
+
+In C Major at Base Octave 3, tap D7 once. It emits no MIDI, changes the current display
+to `Nearest on`, and changes only D7 from LED value `2` to `13`. Pressure updates while
+D7 remains held do not toggle it again. Release D7 between actions below, and release
+each chord before pressing the next:
+
+| Chord press | Exact chord tones | Feedback inversion |
+| --- | --- | --- |
+| A1 (C) | `60 64 67` | `VL 0` |
+| D1 (F) | `60 65 69` | `VL -1` |
+| E1 (G) | `59 62 67` | `VL -2` |
+| A1 (C) | `60 64 67` | `VL 0` |
+
+After the second press the dedicated line is exactly:
+
+`Last: F | Quality Maj | Ext - | Inv VL -1 | MIDI C3(60) F3(65) A3(69)`
+
+The feedback lists the complete new owner snapshot even when another held chord means
+shared pitches do not retrigger. With Nearest on, bass may be toggled or moved without
+changing the selected chord-tone inversion; its root pitch is added afterward.
+
+Press Voice −/0/+, change Live scale, change Base Octave, or toggle Nearest off/on.
+Each action clears prior-chord history, so the next chord exactly matches that action's
+manual baseline and becomes new history. A held owner does not change or retrigger.
+
+Result: `[ ] PASS  [ ] FAIL`
+
+## 8. Snapshot, overlap, and lifecycle
 
 Hold Min (B8) and 9 (H8), press and keep holding A1, then release B8 and H8. The display
 returns to Auto/`Ext -`, while the sounding A1 remains exactly `60 63 67 74` until A1
@@ -171,15 +221,15 @@ shared `64 67` are not retriggered. Releasing A1 ends only `60`; releasing C1 en
 
 Holding any chord during focus loss or device disable emits its exact remaining
 note-offs plus CC123 before matrix release. Returning focus or re-enabling shows
-`Status: matrix acquired`. Momentary quality/extensions clear; voicing and bass
-settings persist.
+`Status: matrix acquired`. Momentary quality/extensions clear; Voice, bass, and
+Nearest mode persist while prior-chord history clears.
 
 Clicking **Reload Grid** while notes are held performs that same exact note-off plus
 CC123 flush before releasing and rediscovering the matrix.
 
 Result: `[ ] PASS  [ ] FAIL`
 
-## 8. Grid recovery
+## 9. Grid recovery
 
 ### Automatic device re-enable
 
@@ -204,14 +254,15 @@ must recover it without deleting/re-adding the device or reloading the Set.
 
 Result: `[ ] PASS  [ ] FAIL`
 
-## 9. LEDs
+## 10. LEDs
 
 - All 32 chord pads are blue (`45`); A/H tonic columns use distinct blue (`49`).
 - A held chord turns white (`3`) and returns to its resting value on release.
 - Quality controls A8–D8 use quality color (`21`) and active accent (`13`).
 - Extensions E8–H8 are dim (`1`) and turn accent (`13`) while held.
 - The currently applicable Voice and Bass register pads use accent (`13`); other step
-  pads use note color (`2`). H7 is dim when bass is off and accent when on.
+  pads use note color (`2`). D7 is note color when Nearest is off and accent when on.
+  H7 is dim when bass is off and accent when on.
 - Every reserved pad is off (`0`).
 - Focus loss clears device colors before Push resumes its normal grid; focus return
   repaints the complete current state.
@@ -220,6 +271,6 @@ Result: `[ ] PASS  [ ] FAIL`
 
 ## Follow-up decision
 
-`[ ] v0.4.5 accepted — velocity, grid recovery, and all retained WP4 behavior pass`
+`[ ] v0.4.7 accepted — live scale changes, Nearest, exact feedback, and retained WP4 behavior pass`
 
-`[ ] v0.4.5 rejected — record only the physical discrepancy; MCP setup remains agent-owned`
+`[ ] v0.4.7 rejected — record only the physical discrepancy; MCP setup remains agent-owned`

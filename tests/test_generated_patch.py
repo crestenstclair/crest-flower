@@ -156,6 +156,8 @@ def test_lifecycle_graph_initializes_and_tracks_device_enablement(tmp_path: Path
         (["runtime-adapter", 1], ["generated-midi-format", 2]),
         (["generated-midi-format", 0], ["thru_midiout", 0]),
         (["runtime-adapter", 3], ["push-native-adapter", 2]),
+        (["runtime-adapter", 4], ["prepend-feedback-set", 0]),
+        (["prepend-feedback-set", 0], ["feedback-display", 0]),
     ]
     for source, destination in required:
         assert {"source": source, "destination": destination} in lines
@@ -172,7 +174,16 @@ def test_lifecycle_graph_initializes_and_tracks_device_enablement(tmp_path: Path
     assert reload_button["maxclass"] == "textbutton"
     assert reload_button["text"] == "Reload Grid"
     assert reload_button["mode"] == 0
-    assert reload_button["presentation_rect"] == [12, 80, 78, 22]
+    assert reload_button["presentation_rect"] == [12, 90, 78, 22]
+
+    boxes = {entry["box"].get("id"): entry["box"] for entry in patcher["boxes"]}
+    assert boxes["runtime-adapter"]["numoutlets"] == 5
+    assert boxes["selection-display"]["text"] == (
+        "Scale C Major | Chord: Auto | Voice 0 | Nearest off | Bass off | Ext -"
+    )
+    assert boxes["feedback-display"]["text"] == "Last: --"
+    assert boxes["selection-display"]["presentation_rect"] == [105, 64, 583, 22]
+    assert boxes["feedback-display"]["presentation_rect"] == [105, 92, 583, 22]
 
 
 def test_native_push_bridge_matches_the_working_lom_enumeration_pattern(tmp_path: Path) -> None:
@@ -238,7 +249,7 @@ def test_manifest_is_deterministic_and_matches_artifact(tmp_path: Path) -> None:
     manifest = json.loads(first_manifest.read_text(encoding="utf-8"))
     assert manifest["artifact"]["sha256"] == sha256(artifact)
     assert manifest["stage"] == "WP4"
-    assert manifest["version"] == "0.4.5"
+    assert manifest["version"] == "0.4.7"
     assert manifest["embedded_runtime_files"] == [
         "active-notes.js",
         "harmony.js",
@@ -260,6 +271,7 @@ def test_release_package_is_reproducible_and_complete(tmp_path: Path) -> None:
     assert first.read_bytes() == second.read_bytes()
     with zipfile.ZipFile(first) as archive:
         assert archive.namelist() == [
+            "PushChordGrid-WP4/CHANGELOG.md",
             "PushChordGrid-WP4/HARDWARE_TESTS.md",
             "PushChordGrid-WP4/ORCHID_ADAPTATION.md",
             "PushChordGrid-WP4/PushChordGrid.amxd",

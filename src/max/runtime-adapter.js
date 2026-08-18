@@ -17,7 +17,7 @@ if (typeof module !== "undefined" && module.exports) {
 if (typeof outlet !== "undefined") {
     autowatch = 0;
     inlets = 1;
-    outlets = 4;
+    outlets = 5;
 }
 
 var FILES = "ABCDEFGH";
@@ -34,6 +34,7 @@ var EXTENSION_CONTROLS = {
     H8: "ninth"
 };
 var VOICING_CONTROLS = {A7: -1, B7: 0, C7: 1};
+var VOICE_LEADING_CONTROL = "D7";
 var BASS_VOICING_CONTROLS = {E7: -1, F7: 0, G7: 1};
 var BASS_TOGGLE_CONTROL = "H7";
 var QUALITY_LABELS = {
@@ -86,6 +87,9 @@ function roleForCoordinate(coordinate) {
     if (VOICING_CONTROLS[coordinate] !== undefined) {
         return "voicing_control";
     }
+    if (coordinate === VOICE_LEADING_CONTROL) {
+        return "voice_leading_control";
+    }
     if (BASS_VOICING_CONTROLS[coordinate] !== undefined) {
         return "bass_voicing_control";
     }
@@ -120,7 +124,8 @@ function createRuntime(options) {
         ledActive: false,
         ledCache: emptyMap(),
         scaleName: "Major",
-        scaleMode: 1
+        scaleMode: 1,
+        lastChordSnapshot: null
     };
 }
 
@@ -181,6 +186,8 @@ function updateSteppedControl(runtime, coordinate, role, pressed) {
         } else {
             runtimeMusicalState.shiftVoicing(runtime.musical, VOICING_CONTROLS[coordinate]);
         }
+    } else if (role === "voice_leading_control") {
+        runtimeMusicalState.toggleVoiceLeading(runtime.musical);
     } else if (role === "bass_voicing_control") {
         if (BASS_VOICING_CONTROLS[coordinate] === 0) {
             runtimeMusicalState.setBassOctave(runtime.musical, -1);
@@ -200,7 +207,7 @@ function processGridEvent(runtime, coordinate, velocity) {
     var role = roleForCoordinate(coordinate);
     var normalizedVelocity = checkedVelocity(velocity);
     var pressed = normalizedVelocity > 0;
-    var pitches;
+    var snapshot;
     if (role === "reserved") {
         return [];
     }
@@ -214,6 +221,7 @@ function processGridEvent(runtime, coordinate, velocity) {
     }
     if (
         role === "voicing_control" ||
+        role === "voice_leading_control" ||
         role === "bass_voicing_control" ||
         role === "bass_toggle_control"
     ) {
@@ -224,16 +232,19 @@ function processGridEvent(runtime, coordinate, velocity) {
         delete runtime.held[coordinate];
         return runtimeActiveNotes.releaseOwner(runtime.notes, coordinate);
     }
-    pitches = runtimeMusicalState.chordForPad(
+    snapshot = runtimeMusicalState.chordSnapshotForPad(
         runtime.musical,
         parsed.rank,
         parsed.column
     );
     runtime.held[coordinate] = true;
+    if (snapshot !== null) {
+        runtime.lastChordSnapshot = snapshot;
+    }
     return runtimeActiveNotes.pressOwner(
         runtime.notes,
         coordinate,
-        pitches,
+        snapshot === null ? [] : snapshot.pitches,
         normalizedVelocity
     );
 }
@@ -243,6 +254,7 @@ function processLifecycle(runtime, lifecycle) {
     runtime.controlHeld = emptyMap();
     runtime.heldQualities = emptyMap();
     runtime.qualityOrder = [];
+    runtime.lastChordSnapshot = null;
     runtimeMusicalState.resetMomentaryModifiers(runtime.musical);
     return runtimeActiveNotes.flushForLifecycle(runtime.notes, lifecycle);
 }
@@ -283,6 +295,10 @@ function ledColorForCoordinate(runtime, coordinate) {
             0,
             VOICING_CONTROLS[coordinate]
         ) ? LED_COLORS.controlOn : LED_COLORS.note;
+    }
+    if (role === "voice_leading_control") {
+        return runtime.musical.voiceLeadingEnabled ?
+            LED_COLORS.controlOn : LED_COLORS.note;
     }
     if (role === "bass_voicing_control") {
         return directionalControlActive(
@@ -353,6 +369,8 @@ function setLedOwnership(runtime, owned) {
     return changes;
 }
 
+var NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+
 function selectionText(runtime) {
     var extensions = [];
     Object.keys(EXTENSION_CONTROLS).forEach(function (coordinate) {
@@ -361,10 +379,51 @@ function selectionText(runtime) {
             extensions.push(EXTENSION_LABELS[extension]);
         }
     });
-    return "Chord: " + QUALITY_LABELS[runtime.musical.chordType] +
+    return "Scale " + NOTE_NAMES[runtime.musical.rootNote] + " " + runtime.scaleName +
+        " | Chord: " + QUALITY_LABELS[runtime.musical.chordType] +
         " | Voice " + runtime.musical.voicing +
+        " | Nearest " + (runtime.musical.voiceLeadingEnabled ? "on" : "off") +
         " | Bass " + (runtime.musical.bassEnabled ? runtime.musical.bassOctave : "off") +
         " | Ext " + (extensions.length ? extensions.join("+") : "-");
+}
+
+var QUALITY_SUFFIXES = {
+    auto: "",
+    diminished: "dim",
+    minor: "m",
+    major: "",
+    suspended: "sus"
+};
+
+function signedInteger(value) {
+    return value > 0 ? "+" + value : String(value);
+}
+
+function noteName(pitch) {
+    return NOTE_NAMES[pitch % 12] + String(Math.floor(pitch / 12) - 2);
+}
+
+function feedbackText(runtime) {
+    var snapshot = runtime.lastChordSnapshot;
+    if (snapshot === null) {
+        return "Last: --";
+    }
+    var root = NOTE_NAMES[snapshot.rootPitch % 12];
+    var chordName = root + QUALITY_SUFFIXES[snapshot.resolvedQuality];
+    var extensions = snapshot.extensions.map(function (extension) {
+        return EXTENSION_LABELS[extension];
+    });
+    var inversion = snapshot.voiceLeadingEnabled ?
+        "VL " + signedInteger(snapshot.nearestAdjustment) :
+        "Voice " + signedInteger(snapshot.manualVoicing);
+    var pitches = snapshot.pitches.map(function (pitch) {
+        return noteName(pitch) + "(" + pitch + ")";
+    });
+    return "Last: " + chordName +
+        " | Quality " + QUALITY_LABELS[snapshot.resolvedQuality] +
+        " | Ext " + (extensions.length ? extensions.join("+") : "-") +
+        " | Inv " + inversion +
+        " | MIDI " + (pitches.length ? pitches.join(" ") : "-");
 }
 
 var maxRuntime = createRuntime();
@@ -388,6 +447,12 @@ function emitSelection() {
     }
 }
 
+function emitFeedback() {
+    if (typeof outlet !== "undefined") {
+        outlet(4, feedbackText(maxRuntime));
+    }
+}
+
 function emitLedEvents(events) {
     if (typeof outlet === "undefined") {
         return;
@@ -403,12 +468,16 @@ function grid_event(coordinate, velocity) {
     if (role !== "chord" && role !== "reserved") {
         emitSelection();
     }
+    if (role === "chord") {
+        emitFeedback();
+    }
     emitLedEvents(renderLedDiff(maxRuntime));
 }
 
 function lifecycle(name) {
     emitEvents(processLifecycle(maxRuntime, String(name)));
     emitSelection();
+    emitFeedback();
     emitLedEvents(renderLedDiff(maxRuntime));
 }
 
@@ -416,20 +485,27 @@ function grid_ownership(value) {
     emitLedEvents(setLedOwnership(maxRuntime, parseInt(value, 10) !== 0));
 }
 
+function applyScaleSnapshot(runtime, rootNote, intervals) {
+    runtimeMusicalState.updateScale(runtime.musical, rootNote, intervals);
+}
+
 function scale() {
     var values = Array.prototype.slice.call(arguments);
     var rootNote = parseInt(values.shift(), 10);
     var intervals = values.map(function (value) { return parseInt(value, 10); });
-    runtimeMusicalState.updateScale(maxRuntime.musical, rootNote, intervals);
+    applyScaleSnapshot(maxRuntime, rootNote, intervals);
+    emitSelection();
     emitLedEvents(renderLedDiff(maxRuntime));
 }
 
 function scale_name() {
     maxRuntime.scaleName = Array.prototype.slice.call(arguments).join(" ");
+    emitSelection();
 }
 
 function scale_mode(value) {
     maxRuntime.scaleMode = parseInt(value, 10) !== 0 ? 1 : 0;
+    emitSelection();
 }
 
 function base_octave(value) {
@@ -445,7 +521,10 @@ if (typeof module !== "undefined" && module.exports) {
         LED_COLORS: LED_COLORS,
         QUALITY_CONTROLS: QUALITY_CONTROLS,
         VOICING_CONTROLS: VOICING_CONTROLS,
+        VOICE_LEADING_CONTROL: VOICE_LEADING_CONTROL,
+        applyScaleSnapshot: applyScaleSnapshot,
         createRuntime: createRuntime,
+        feedbackText: feedbackText,
         gridContract: gridContract,
         ledColorForCoordinate: ledColorForCoordinate,
         ledFrame: ledFrame,

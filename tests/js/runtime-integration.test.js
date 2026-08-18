@@ -25,8 +25,9 @@ test("all 64 coordinates have one documented role", () => {
         }, {}),
         {
             chord: 32,
-            reserved: 17,
+            reserved: 16,
             voicing_control: 3,
+            voice_leading_control: 1,
             bass_voicing_control: 3,
             bass_toggle_control: 1,
             quality_control: 4,
@@ -47,7 +48,7 @@ test("all 64 coordinates have one documented role", () => {
             (coordinate) => contract[coordinate]
         ),
         [
-            "voicing_control", "voicing_control", "voicing_control", "reserved",
+            "voicing_control", "voicing_control", "voicing_control", "voice_leading_control",
             "bass_voicing_control", "bass_voicing_control", "bass_voicing_control",
             "bass_toggle_control"
         ]
@@ -124,7 +125,7 @@ test("Orchid quality and extension pads are momentary snapshot modifiers", () =>
     integration.processGridEvent(runtime, "H8", 100);
     assert.equal(
         integration.selectionText(runtime),
-        "Chord: Min | Voice 0 | Bass off | Ext 6+m7+M7+9"
+        "Scale C Major | Chord: Min | Voice 0 | Nearest off | Bass off | Ext 6+m7+M7+9"
     );
     assert.deepEqual(integration.processGridEvent(runtime, "A1", 90), [
         noteOn(60, 90), noteOn(63, 90), noteOn(67, 90), noteOn(69, 90),
@@ -136,7 +137,7 @@ test("Orchid quality and extension pads are momentary snapshot modifiers", () =>
     });
     assert.equal(
         integration.selectionText(runtime),
-        "Chord: Auto | Voice 0 | Bass off | Ext -"
+        "Scale C Major | Chord: Auto | Voice 0 | Nearest off | Bass off | Ext -"
     );
     assert.deepEqual(integration.processGridEvent(runtime, "A1", 0), [
         noteOff(60), noteOff(63), noteOff(67), noteOff(69),
@@ -162,7 +163,7 @@ test("voicing and bass controls persist and only step once per physical press", 
     const runtime = integration.createRuntime();
     assert.equal(
         integration.selectionText(runtime),
-        "Chord: Auto | Voice 0 | Bass off | Ext -"
+        "Scale C Major | Chord: Auto | Voice 0 | Nearest off | Bass off | Ext -"
     );
 
     integration.processGridEvent(runtime, "C7", 100);
@@ -181,7 +182,7 @@ test("voicing and bass controls persist and only step once per physical press", 
     integration.processGridEvent(runtime, "E7", 0);
     assert.equal(
         integration.selectionText(runtime),
-        "Chord: Auto | Voice 1 | Bass -2 | Ext -"
+        "Scale C Major | Chord: Auto | Voice 1 | Nearest off | Bass -2 | Ext -"
     );
     assert.deepEqual(integration.processGridEvent(runtime, "A1", 64), [
         noteOn(36, 64), noteOn(64, 64), noteOn(67, 64), noteOn(72, 64)
@@ -198,6 +199,80 @@ test("voicing and bass controls persist and only step once per physical press", 
     integration.processGridEvent(runtime, "G7", 0);
     assert.equal(runtime.musical.voicing, 0);
     assert.equal(runtime.musical.bassOctave, 0);
+});
+
+test("D7 toggles nearest voice leading once per press and never emits MIDI", () => {
+    const runtime = integration.createRuntime();
+    integration.setLedOwnership(runtime, true);
+    assert.deepEqual(integration.processGridEvent(runtime, "D7", 100), []);
+    assert.equal(runtime.musical.voiceLeadingEnabled, true);
+    assert.equal(
+        integration.selectionText(runtime),
+        "Scale C Major | Chord: Auto | Voice 0 | Nearest on | Bass off | Ext -"
+    );
+    assert.deepEqual(integration.renderLedDiff(runtime), [
+        {coordinate: "D7", x: 3, y: 1, value: 13}
+    ]);
+    assert.deepEqual(integration.processGridEvent(runtime, "D7", 80), []);
+    assert.equal(runtime.musical.voiceLeadingEnabled, true);
+    assert.deepEqual(integration.processGridEvent(runtime, "D7", 0), []);
+    assert.deepEqual(integration.processGridEvent(runtime, "D7", 127), []);
+    assert.equal(runtime.musical.voiceLeadingEnabled, false);
+});
+
+test("nearest mode follows the exact C major I-IV-V-I golden progression", () => {
+    const runtime = integration.createRuntime();
+    integration.processGridEvent(runtime, "D7", 100);
+    integration.processGridEvent(runtime, "D7", 0);
+    const progression = [
+        ["A1", [60, 64, 67], 0, 0],
+        ["D1", [60, 65, 69], -1, 6],
+        ["E1", [59, 62, 67], -2, 10],
+        ["A1", [60, 64, 67], 0, 6]
+    ];
+    progression.forEach(([coordinate, pitches, adjustment, score]) => {
+        integration.processGridEvent(runtime, coordinate, 91);
+        assert.deepEqual(runtime.lastChordSnapshot.chordPitches, pitches);
+        assert.equal(runtime.lastChordSnapshot.nearestAdjustment, adjustment);
+        assert.equal(runtime.lastChordSnapshot.nearestScore, score);
+        integration.processGridEvent(runtime, coordinate, 0);
+    });
+});
+
+test("last-chord feedback is the complete owner snapshot, including shared pitches", () => {
+    const runtime = integration.createRuntime();
+    assert.equal(integration.feedbackText(runtime), "Last: --");
+    integration.processGridEvent(runtime, "A1", 100);
+    assert.equal(
+        integration.feedbackText(runtime),
+        "Last: C | Quality Maj | Ext - | Inv Voice 0 | MIDI C3(60) E3(64) G3(67)"
+    );
+    assert.deepEqual(integration.processGridEvent(runtime, "C1", 80), [noteOn(71, 80)]);
+    assert.equal(
+        integration.feedbackText(runtime),
+        "Last: Em | Quality Min | Ext - | Inv Voice 0 | MIDI E3(64) G3(67) B3(71)"
+    );
+    integration.processGridEvent(runtime, "C1", 0);
+    assert.match(integration.feedbackText(runtime), /^Last: Em/);
+    integration.processLifecycle(runtime, "focus_lost");
+    assert.equal(integration.feedbackText(runtime), "Last: --");
+});
+
+test("feedback identifies extensions, bass, manual quality, and nearest inversion", () => {
+    const runtime = integration.createRuntime();
+    integration.processGridEvent(runtime, "B8", 100);
+    integration.processGridEvent(runtime, "H8", 100);
+    integration.processGridEvent(runtime, "H7", 100);
+    integration.processGridEvent(runtime, "H7", 0);
+    integration.processGridEvent(runtime, "D7", 100);
+    integration.processGridEvent(runtime, "D7", 0);
+    integration.processGridEvent(runtime, "A1", 64);
+    integration.processGridEvent(runtime, "A1", 0);
+    integration.processGridEvent(runtime, "D1", 64);
+    assert.equal(
+        integration.feedbackText(runtime),
+        "Last: Fm | Quality Min | Ext 9 | Inv VL -2 | MIDI F2(53) C3(60) F3(65) G3(67) G#3(68)"
+    );
 });
 
 test("overlapping holds reference-count shared voices and lifecycle flushes", () => {
@@ -229,7 +304,7 @@ test("lifecycle clears held modifiers but preserves voicing and bass selections"
     assert.equal(runtime.musical.bassEnabled, true);
     assert.equal(
         integration.selectionText(runtime),
-        "Chord: Auto | Voice 1 | Bass -1 | Ext -"
+        "Scale C Major | Chord: Auto | Voice 1 | Nearest off | Bass -1 | Ext -"
     );
 });
 
@@ -245,7 +320,7 @@ test("LED ownership paints one complete documented frame then stays diff-only", 
     assert.deepEqual(byCoordinate.E8, {coordinate: "E8", x: 4, y: 0, value: 1});
     assert.deepEqual(byCoordinate.A7, {coordinate: "A7", x: 0, y: 1, value: 2});
     assert.deepEqual(byCoordinate.B7, {coordinate: "B7", x: 1, y: 1, value: 13});
-    assert.deepEqual(byCoordinate.D7, {coordinate: "D7", x: 3, y: 1, value: 0});
+    assert.deepEqual(byCoordinate.D7, {coordinate: "D7", x: 3, y: 1, value: 2});
     assert.deepEqual(byCoordinate.F7, {coordinate: "F7", x: 5, y: 1, value: 13});
     assert.deepEqual(byCoordinate.H7, {coordinate: "H7", x: 7, y: 1, value: 1});
     assert.deepEqual(byCoordinate.A4, {coordinate: "A4", x: 0, y: 4, value: 49});

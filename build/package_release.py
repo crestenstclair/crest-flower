@@ -34,6 +34,7 @@ def package_release(artifact: Path, manifest: Path, output: Path) -> Path:
         ("HARDWARE_TESTS.md", (ROOT / "docs/HARDWARE_TESTS.md").read_bytes()),
         ("ORCHID_ADAPTATION.md", (ROOT / "docs/ORCHID_ADAPTATION.md").read_bytes()),
         ("USAGE_GUIDE.html", (ROOT / "docs/USAGE_GUIDE.html").read_bytes()),
+        ("CHANGELOG.md", (ROOT / "CHANGELOG.md").read_bytes()),
         ("README.md", (ROOT / "README.md").read_bytes()),
     ]
     output.parent.mkdir(parents=True, exist_ok=True)

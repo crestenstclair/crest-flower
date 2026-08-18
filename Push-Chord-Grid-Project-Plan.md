@@ -24,6 +24,11 @@ begun. Version 0.4.4 correlates raw physical chord-pad velocities with matrix
 coordinates and records the proposed harmonic feature set as approved direction.
 Version 0.4.5 adds automatic re-enable discovery and a safe manual Reload Grid path
 for stale matrix ownership after device or hardware cycling.
+Version 0.4.6 assigns D7 to persistent nearest voice leading and adds exact
+last-chord/inversion/extension/emitted-pitch feedback. Advanced held-chord mutation,
+Secret Chords, snapshots, and split output remain unimplemented separate changes.
+Version 0.4.7 normalizes LiveAPI's array-wrapped scale callbacks and shows the detected
+Live scale on the device face so post-load key changes are both applied and visible.
 
 ## 1. Intent
 
@@ -519,8 +524,8 @@ work and is not part of this follow-up.
 - Preserve raw external MIDI passthrough, snapshot ownership, shared-pitch reference
   counts, lifecycle flushes, LEDs, and Standalone-compatible dependencies.
 - Nearest voice leading, Advanced held-chord behavior, Secret Chords, performance
-  snapshots, split output exploration, and clearer feedback are approved product
-  direction only. They remain unimplemented pending their own work package.
+  snapshots, split output exploration, and clearer feedback were approved product
+  direction; v0.4.6 implements Nearest and clearer feedback only.
 
 ### WP4 follow-up — resilient grid recovery (implemented in 0.4.5)
 
@@ -532,6 +537,30 @@ work and is not part of this follow-up.
   rediscover Push, reacquire the matrix, and repaint all 64 coordinates.
 - Reload emits no musical trigger and preserves persistent voicing/bass state while
   clearing momentary controls through the existing lifecycle contract.
+
+### WP4 follow-up — nearest voice leading and exact feedback (implemented in 0.4.6)
+
+- Assign D7 exactly one silent `voice_leading_control` role; press edges toggle the
+  persistent mode and its LED reflects off/on state.
+- Score the selected row/manual Voice baseline plus one complete inversion rotation
+  against the prior chord tones using symmetric nearest-tone distance. Resolve ties by
+  smallest absolute adjustment, then lower signed adjustment.
+- Exclude bass from inversion scoring, add it afterward, and keep sounding owners as
+  immutable release snapshots.
+- Clear voice-leading history on mode/manual-voicing/scale/Base Octave changes and
+  lifecycle loss while preserving the enabled mode across ordinary ownership loss.
+- Show current Nearest state separately from the exact last chord name, resolved
+  quality/extensions, inversion choice, and emitted note-name/MIDI-number snapshot.
+
+### WP4 follow-up — live scale observer correction (implemented in 0.4.7)
+
+- Accept LiveAPI observer updates in the actual single-array callback shape as well as
+  direct/property-prefixed initial query values.
+- Apply root and interval updates to future chord presses immediately; scale changes
+  clear Nearest history without mutating already sounding owners.
+- Show the detected root and scale name on the current-state line so Live and device
+  state can be compared without generating a test chord.
+- Golden-test a post-initialization C Major to C Minor observer transition.
 
 ## 10. Automated validation requirements
 

@@ -1,8 +1,8 @@
 {
   "artifact": {
-    "bytes": 85704,
+    "bytes": 94903,
     "path": "PushChordGrid.amxd",
-    "sha256": "b276cc22c4882d130e54385cba67d45bf3b3ac1d0fd7d8e17094d0ffee57b549",
+    "sha256": "fc261d64489d2c2127cbcf5fa50da42048cf27361027691ea493e1aacc66f467",
     "type_code": "mmmm"
   },
   "embedded_runtime_files": [
@@ -25,5 +25,5 @@
   "stored_parameters": [
     "Base Octave"
   ],
-  "version": "0.4.5"
+  "version": "0.4.7"
 }

@@ -1,6 +1,6 @@
 [project]
 name = "push-chord-grid"
-version = "0.4.5"
+version = "0.4.7"
 description = "Generated Max for Live MIDI effect for Ableton Push 3"
 requires-python = ">=3.11"
 

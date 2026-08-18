@@ -14,8 +14,17 @@ var scaleName = "Major";
 var scaleMode = 1;
 var observers = [];
 
-function valuesWithoutProperty(args, property) {
+function callbackArguments(args) {
     var values = Array.prototype.slice.call(args || []);
+    if (values.length === 1 && values[0] && typeof values[0] !== "string" &&
+            values[0].length !== undefined) {
+        return Array.prototype.slice.call(values[0]);
+    }
+    return values;
+}
+
+function valuesWithoutProperty(args, property) {
+    var values = callbackArguments(args);
     if (values.length && String(values[0]) === property) {
         values.shift();
     }
@@ -23,7 +32,7 @@ function valuesWithoutProperty(args, property) {
 }
 
 function lastInteger(args, fallback) {
-    var values = Array.prototype.slice.call(args || []);
+    var values = callbackArguments(args);
     var index;
     for (index = values.length - 1; index >= 0; index -= 1) {
         var parsed = parseInt(values[index], 10);
@@ -125,6 +134,7 @@ function notifydeleted() {
 if (typeof module !== "undefined" && module.exports) {
     module.exports = {
         DEFAULT_INTERVALS: DEFAULT_INTERVALS,
+        callbackArguments: callbackArguments,
         callbackValues: callbackValues,
         lastInteger: lastInteger,
         normalizedIntervals: normalizedIntervals,

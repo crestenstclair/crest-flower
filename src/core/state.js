@@ -28,6 +28,8 @@ function createState(options) {
         chordType: "auto",
         extensions: emptyExtensions(),
         voicing: 0,
+        voiceLeadingEnabled: false,
+        voiceLeadingPitches: [],
         bassEnabled: false,
         bassOctave: -1,
         rootNote: rootNote,
@@ -56,6 +58,7 @@ function setExtension(state, extension, enabled) {
 function setVoicing(state, voicing) {
     stateHarmony.applyVoicing([], voicing);
     state.voicing = voicing;
+    resetVoiceLeadingHistory(state);
 }
 
 function shiftVoicing(state, direction) {
@@ -89,6 +92,17 @@ function resetMomentaryModifiers(state) {
     EXTENSIONS.forEach(function (extension) {
         state.extensions[extension] = false;
     });
+    resetVoiceLeadingHistory(state);
+}
+
+function resetVoiceLeadingHistory(state) {
+    state.voiceLeadingPitches = [];
+}
+
+function toggleVoiceLeading(state) {
+    state.voiceLeadingEnabled = !state.voiceLeadingEnabled;
+    resetVoiceLeadingHistory(state);
+    return state.voiceLeadingEnabled;
 }
 
 function updateScale(state, rootNote, intervals) {
@@ -96,32 +110,98 @@ function updateScale(state, rootNote, intervals) {
     stateHarmony.tonicPitch(rootNote, state.baseOctave);
     state.rootNote = rootNote;
     state.scaleIntervals = normalized;
+    resetVoiceLeadingHistory(state);
 }
 
 function updateBaseOctave(state, baseOctave) {
     stateHarmony.tonicPitch(state.rootNote, baseOctave);
     state.baseOctave = baseOctave;
+    resetVoiceLeadingHistory(state);
 }
 
-function chordForPad(state, row, degree) {
-    return stateHarmony.orchidChordPitches(
+function resolvedQuality(rootPitch, chordPitches, requestedType) {
+    if (requestedType !== "auto") {
+        return requestedType;
+    }
+    var intervals = chordPitches.map(function (pitch) {
+        return (pitch - rootPitch + 120) % 12;
+    });
+    if (intervals.indexOf(3) !== -1 && intervals.indexOf(6) !== -1) {
+        return "diminished";
+    }
+    if (intervals.indexOf(3) !== -1 && intervals.indexOf(7) !== -1) {
+        return "minor";
+    }
+    if (intervals.indexOf(4) !== -1 && intervals.indexOf(7) !== -1) {
+        return "major";
+    }
+    if (intervals.indexOf(5) !== -1 && intervals.indexOf(7) !== -1) {
+        return "suspended";
+    }
+    return "auto";
+}
+
+function chordSnapshotForPad(state, row, degree) {
+    var baseRoot = stateHarmony.degreeRoot(
         state.rootNote,
         state.scaleIntervals,
         state.baseOctave,
-        row,
-        degree,
-        state.chordType,
-        state.extensions,
-        state.voicing,
-        state.bassEnabled,
-        state.bassOctave
+        degree
     );
+    var rootPitch = baseRoot === null ? null : baseRoot + (row - 1) * 12;
+    if (rootPitch === null || rootPitch > 127) {
+        return null;
+    }
+    var triad = state.chordType === "auto" ?
+        stateHarmony.diatonicChordPitches(
+            state.rootNote,
+            state.scaleIntervals,
+            state.baseOctave,
+            row,
+            degree
+        ) : stateHarmony.qualityChordPitches(rootPitch, state.chordType);
+    var chordPitches = stateHarmony.addExtensions(triad, rootPitch, state.extensions);
+    chordPitches = stateHarmony.applyVoicing(chordPitches, state.voicing);
+    var nearest = {pitches: chordPitches, adjustment: 0, score: 0};
+    if (state.voiceLeadingEnabled && state.voiceLeadingPitches.length > 0) {
+        nearest = stateHarmony.nearestVoicing(chordPitches, state.voiceLeadingPitches);
+    }
+    chordPitches = nearest.pitches;
+    if (state.voiceLeadingEnabled) {
+        state.voiceLeadingPitches = chordPitches.slice();
+    }
+    return {
+        rootPitch: rootPitch,
+        requestedQuality: state.chordType,
+        resolvedQuality: resolvedQuality(rootPitch, triad, state.chordType),
+        extensions: EXTENSIONS.filter(function (extension) {
+            return state.extensions[extension];
+        }),
+        manualVoicing: state.voicing,
+        voiceLeadingEnabled: state.voiceLeadingEnabled,
+        nearestAdjustment: nearest.adjustment,
+        nearestScore: nearest.score,
+        chordPitches: chordPitches.slice(),
+        pitches: stateHarmony.addBass(
+            chordPitches,
+            rootPitch,
+            state.bassEnabled,
+            state.bassOctave
+        )
+    };
+}
+
+function chordForPad(state, row, degree) {
+    var snapshot = chordSnapshotForPad(state, row, degree);
+    return snapshot === null ? [] : snapshot.pitches;
 }
 
 var musicalState = {
+    chordSnapshotForPad: chordSnapshotForPad,
     chordForPad: chordForPad,
     createState: createState,
     resetMomentaryModifiers: resetMomentaryModifiers,
+    resetVoiceLeadingHistory: resetVoiceLeadingHistory,
     setBassOctave: setBassOctave,
     setChordType: setChordType,
     setExtension: setExtension,
@@ -129,6 +209,7 @@ var musicalState = {
     shiftBassOctave: shiftBassOctave,
     shiftVoicing: shiftVoicing,
     toggleBass: toggleBass,
+    toggleVoiceLeading: toggleVoiceLeading,
     updateBaseOctave: updateBaseOctave,
     updateScale: updateScale
 };

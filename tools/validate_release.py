@@ -15,7 +15,7 @@ try:
 except ImportError:  # Direct script execution.
     from inspect_amxd import AmxdValidationError, summary, validate_amxd
 
-PROJECT_VERSION = "0.4.5"
+PROJECT_VERSION = "0.4.7"
 BUILD_STAGE = "WP4"
 GENERATOR_NAME = "m4l-builder"
 GENERATOR_VERSION = "0.8.0"

@@ -218,7 +218,7 @@ def validate_document(document: AmxdDocument) -> list[str]:
             "prepend initialized": 1,
             "prepend pad_velocity": 1,
             "prepend reload": 1,
-            "prepend set": 3,
+            "prepend set": 4,
             "sel 1": 1,
             "t b b": 1,
         }
@@ -293,7 +293,9 @@ def validate_document(document: AmxdDocument) -> list[str]:
         ("generated-midi-format", 0, "thru_midiout", 0),
         ("runtime-adapter", 2, "prepend-selection-set", 0),
         ("runtime-adapter", 3, "push-native-adapter", 2),
+        ("runtime-adapter", 4, "prepend-feedback-set", 0),
         ("prepend-selection-set", 0, "selection-display", 0),
+        ("prepend-feedback-set", 0, "feedback-display", 0),
         ("base-octave", 0, "prepend-base-octave", 0),
         ("prepend-base-octave", 0, "runtime-adapter", 0),
     }
@@ -308,8 +310,8 @@ def validate_document(document: AmxdDocument) -> list[str]:
     }
     if not required_edges.issubset(actual_edges):
         errors.append("WP4 scale/grid/MIDI/lifecycle graph is incomplete")
-    if len(lines) != 36:
-        errors.append(f"WP4 root graph has {len(lines)} patchlines, expected 36")
+    if len(lines) != 38:
+        errors.append(f"WP4 root graph has {len(lines)} patchlines, expected 38")
 
     reload_buttons = [
         box
@@ -327,7 +329,8 @@ def validate_document(document: AmxdDocument) -> list[str]:
     expected_comments = {
         "last-pad-display": "Pad: --",
         "matrix-status-display": "Status: waiting for Live",
-        "selection-display": "Chord: Auto | Voice 0 | Bass off | Ext -",
+        "selection-display": "Scale C Major | Chord: Auto | Voice 0 | Nearest off | Bass off | Ext -",
+        "feedback-display": "Last: --",
     }
     if comments != expected_comments:
         errors.append(f"WP4 status displays are unexpected: {comments!r}")

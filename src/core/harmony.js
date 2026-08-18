@@ -150,6 +150,69 @@ function applyVoicing(pitches, steps) {
     return result;
 }
 
+function closestPitchDistance(pitch, pitches) {
+    var closest = MIDI_MAX_PITCH + 1;
+    pitches.forEach(function (candidate) {
+        closest = Math.min(closest, Math.abs(pitch - candidate));
+    });
+    return closest;
+}
+
+function symmetricVoiceLeadingDistance(pitches, previousPitches) {
+    var current = normalizedPitches(pitches);
+    var previous = normalizedPitches(previousPitches);
+    if (current.length === 0 || previous.length === 0) {
+        return 0;
+    }
+    var score = 0;
+    current.forEach(function (pitch) {
+        score += closestPitchDistance(pitch, previous);
+    });
+    previous.forEach(function (pitch) {
+        score += closestPitchDistance(pitch, current);
+    });
+    return score;
+}
+
+function nearestVoicing(pitches, previousPitches) {
+    var baseline = normalizedPitches(pitches);
+    var previous = normalizedPitches(previousPitches);
+    if (baseline.length === 0 || previous.length === 0) {
+        return {pitches: baseline, adjustment: 0, score: 0};
+    }
+    var best = null;
+    var seen = {};
+    var maximumAdjustment = baseline.length - 1;
+    var adjustment;
+    for (adjustment = -maximumAdjustment;
+        adjustment <= maximumAdjustment;
+        adjustment += 1) {
+        var candidatePitches = applyVoicing(baseline, adjustment);
+        if (candidatePitches.length !== baseline.length) {
+            continue;
+        }
+        var key = candidatePitches.join(",");
+        if (seen[key]) {
+            continue;
+        }
+        seen[key] = true;
+        var candidate = {
+            pitches: candidatePitches,
+            adjustment: adjustment === 0 ? 0 : adjustment,
+            score: symmetricVoiceLeadingDistance(candidatePitches, previous)
+        };
+        if (
+            best === null ||
+            candidate.score < best.score ||
+            (candidate.score === best.score &&
+                Math.abs(candidate.adjustment) < Math.abs(best.adjustment))
+        ) {
+            best = candidate;
+        }
+    }
+    return best;
+}
+
 function addBass(pitches, rootPitch, enabled, bassOctave) {
     assertIntegerInRange(bassOctave, -4, 1, "bass octave");
     var result = pitches.slice();
@@ -194,9 +257,11 @@ var harmony = {
     degreeRoot: degreeRoot,
     diatonicChordPitches: diatonicChordPitches,
     normalizedPitches: normalizedPitches,
+    nearestVoicing: nearestVoicing,
     orchidChordPitches: orchidChordPitches,
     qualityChordPitches: qualityChordPitches,
     scaleDegreePitch: scaleDegreePitch,
+    symmetricVoiceLeadingDistance: symmetricVoiceLeadingDistance,
     tonicPitch: tonicPitch,
     validateScaleIntervals: validateScaleIntervals
 };

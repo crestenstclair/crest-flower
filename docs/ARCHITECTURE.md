@@ -87,6 +87,8 @@ Reload Grid button ─▶ release + rediscover ─┤
                                             ▼
 Push matrix ───────────────┐
 raw pad velocity (36–67) ──┴▶ grid adapter ─▶ coordinate router ─▶ WP3 musical engine
+                              │              │                 ├▶ nearest-history scorer
+                              │              │                 ├▶ exact chord feedback
                               │              │                 │
                               │              └───────────────▶ active-note flush
                               └──────────────────────────────▶ LED state/diff cache
@@ -101,11 +103,14 @@ external MIDI ──────────────────────
 `live-scale-adapter.js` observes `root_note`, `scale_intervals`, `scale_name`, and
 `scale_mode` on `live_set`. Root and interval snapshots drive the pitch engine; name
 and mode are retained as observed metadata. Scale Mode being off does not replace the
-last Live root/scale values.
+last Live root/scale values. LiveAPI delivers observed changes as a single array
+argument, while initial `get` values may be direct or property-prefixed; the adapter
+normalizes both shapes before parsing and forwarding one complete scale snapshot.
 
 `runtime-adapter.js` is the only coordinate-to-music boundary. It classifies all 64
 pads: 32 chords, four quality controls, four extension controls, three chord-voicing
-controls, three bass-register controls, one bass toggle, and 17 reserved pads. Controls
+controls, one Nearest control, three bass-register controls, one bass toggle, and 16
+reserved pads. Controls
 and reserved pads return no note-on. Musical presses enter
 the accepted WP3 engine, and releases use the exact stored owner snapshot.
 
@@ -148,8 +153,18 @@ lowest or lowers the highest chord tone by an octave. Optional bass follows the 
 root through a separate octave state. H is tonic +12. Ranks 1–4 add 0/12/24/36
 semitones to the Base Octave, whose Live label convention makes C3 MIDI 60.
 
+When D7 Nearest mode is on, `harmony.js` scores the manual-voicing baseline plus every
+MIDI-safe inversion within one chord rotation against the prior chord-tone snapshot.
+The symmetric score sums each side's distance to its closest opposing tone; ties keep
+the smallest absolute adjustment and then the lower signed adjustment. Bass is added
+after selection and cannot steer the inversion. Mode/manual-voicing/scale/Base Octave
+changes and lifecycle flushes clear history; ordinary release does not.
+
 `state.js` owns only future-trigger state: Live scale, Base Octave, momentary chord
-type/extensions, and persistent chord/bass voicing. A held pad's pitch array is copied
+type/extensions, persistent chord/Nearest/bass voicing, and the prior chord-tone
+snapshot. The generated snapshot also carries root, resolved quality, extensions,
+inversion adjustment, chord tones, and final pitches to the dedicated feedback line.
+A held pad's pitch array is copied
 into `active-notes.js`; later state changes therefore cannot change its release. Each
 pitch is emitted on the first
 owner transition from zero to one and released on the last transition from one to zero.

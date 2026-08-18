@@ -161,10 +161,10 @@ def create_push_native_adapter() -> Subpatcher:
 
 def create_device() -> MidiEffect:
     """Return the complete WP4 device graph."""
-    device = MidiEffect(DEVICE_NAME, width=440, height=112)
+    device = MidiEffect(DEVICE_NAME, width=700, height=122)
     device.add_panel(
         "background",
-        [0, 0, 440, 112],
+        [0, 0, 700, 122],
         bgcolor=[0.10, 0.11, 0.13, 1.0],
         border=0,
     )
@@ -201,7 +201,7 @@ def create_device() -> MidiEffect:
         "runtime-adapter",
         "js runtime-adapter.js",
         numinlets=1,
-        numoutlets=4,
+        numoutlets=5,
         patching_rect=[350, 300, 156, 22],
     )
     device.add_newobj(
@@ -291,7 +291,7 @@ def create_device() -> MidiEffect:
     )
     device.add_textbutton(
         "reload-grid-button",
-        [12, 80, 78, 22],
+        [12, 90, 78, 22],
         "Reload Grid",
         mode=0,
         fontsize=10.0,
@@ -337,6 +337,13 @@ def create_device() -> MidiEffect:
         patching_rect=[520, 350, 72, 22],
     )
     device.add_newobj(
+        "prepend-feedback-set",
+        "prepend set",
+        numinlets=1,
+        numoutlets=1,
+        patching_rect=[610, 350, 72, 22],
+    )
+    device.add_newobj(
         "prepend-base-octave",
         "prepend base_octave",
         numinlets=1,
@@ -345,26 +352,34 @@ def create_device() -> MidiEffect:
     )
     device.add_comment(
         "last-pad-display",
-        [105, 8, 323, 22],
+        [105, 8, 583, 22],
         "Pad: --",
         presentation=1,
-        presentation_rect=[105, 8, 323, 22],
+        presentation_rect=[105, 8, 583, 22],
         textcolor=[0.85, 0.88, 0.92, 1.0],
     )
     device.add_comment(
         "matrix-status-display",
-        [105, 38, 323, 22],
+        [105, 36, 583, 22],
         "Status: waiting for Live",
         presentation=1,
-        presentation_rect=[105, 38, 323, 22],
+        presentation_rect=[105, 36, 583, 22],
         textcolor=[0.85, 0.88, 0.92, 1.0],
     )
     device.add_comment(
         "selection-display",
-        [105, 68, 323, 22],
-        "Chord: Auto | Voice 0 | Bass off | Ext -",
+        [105, 64, 583, 22],
+        "Scale C Major | Chord: Auto | Voice 0 | Nearest off | Bass off | Ext -",
         presentation=1,
-        presentation_rect=[105, 68, 323, 22],
+        presentation_rect=[105, 64, 583, 22],
+        textcolor=[0.85, 0.88, 0.92, 1.0],
+    )
+    device.add_comment(
+        "feedback-display",
+        [105, 92, 583, 22],
+        "Last: --",
+        presentation=1,
+        presentation_rect=[105, 92, 583, 22],
         textcolor=[0.85, 0.88, 0.92, 1.0],
     )
     device.add_line(base_octave, 0, "prepend-base-octave", 0)
@@ -401,7 +416,9 @@ def create_device() -> MidiEffect:
     device.add_line("generated-midi-format", 0, "thru_midiout", 0)
     device.add_line("runtime-adapter", 2, "prepend-selection-set", 0)
     device.add_line("runtime-adapter", 3, "push-native-adapter", 2)
+    device.add_line("runtime-adapter", 4, "prepend-feedback-set", 0)
     device.add_line("prepend-selection-set", 0, "selection-display", 0)
+    device.add_line("prepend-feedback-set", 0, "feedback-display", 0)
     return device
 
 

@@ -10,7 +10,9 @@ chords 1–8, with every higher rank one octave above the last. Live's current r
 scale automatically determine every default chord quality and pitch. Inspired by
 Telepathic Instruments Orchid, A8–D8 momentarily override Dim/Min/Maj/Sus, E8–H8 add
 independent 6/m7/M7/9 notes, and rank 7 controls inversion and an optional root bass
-voice.
+voice. D7 toggles a persistent Nearest mode that chooses the closest deterministic
+inversion to the previously triggered chord while preserving the selected octave row
+and manual Voice baseline.
 Held pads retain exact pitch snapshots; shared pitches are reference-counted; focus,
 disable, and deletion lifecycles flush active notes plus CC123.
 
@@ -23,6 +25,16 @@ Version 0.4.5 makes grid recovery explicit. Re-enabling the device automatically
 rediscovers Push before reacquisition, and the device face includes a **Reload Grid**
 button that safely flushes notes, releases stale ownership, rediscovers the matrix,
 reacquires it, and repaints the complete LED frame.
+
+Version 0.4.6 adds nearest voice leading and a dedicated last-chord display. The
+display names the resolved chord, extensions, manual/nearest inversion, and the exact
+note-name/MIDI-number snapshot sent to ownership and recording. D7 and all other
+controls remain silent MIDI controls.
+
+Version 0.4.7 fixes live scale changes after device initialization. LiveAPI observer
+callbacks are normalized in their actual array-wrapped runtime shape, and the device
+face now shows the detected scale (for example, `Scale C Minor`) before the current
+chord controls.
 
 The owned grid is state-lit: active modifiers, voicing, and bass state use an accent;
 chord pads share a blue family with distinct tonics; held musical pads turn white; and
@@ -62,15 +74,15 @@ Strum and Arp are intentionally handled by downstream Ableton MIDI devices rathe
 embedded here. Push Chord Grid owns harmony, extensions, voicing, and bass; Live's
 composable MIDI-effect chain owns timed transformations.
 
-The local acceptance workspace also contains the MCP-created
+The local acceptance workspace also contains the MCP-maintained
 `dist/PushChordGrid-WP1-Test Project/PushChordGrid-WP4-Test.als` with the source,
 Post-FX recording route, and Drift destination. It is test evidence, not a reproducible
 release artifact produced by `make`.
 
 ## WP4 hardware evidence
 
-The MCP-configured test Set already contains the installed device on **WP4 Grid
-Source** and an armed **WP4 Grid Record** track fed from Post FX with Drift. The agent
+The MCP-configured test Set contains only **Producer Pal Control**, **Push Chord
+Grid**, and an armed **Chord Recorder + Drift** track fed from Post FX. The agent
 installed v0.4.5 and completed Live-side scale, focus, routing, automatic
 disable/re-enable recovery, and manual Reload Grid checks. The device returned to
 `Status: matrix acquired` after both recovery paths. The user confirmed the complete
@@ -90,3 +102,7 @@ automatic diatonic chord layout, and 0.4.3 adds the Orchid harmonic surface with
 beginning WP5. Version 0.4.4 fixes physical chord-pad velocity propagation and records
 the proposed harmonic feature set as approved direction. Version 0.4.5 adds automatic
 and manual grid recovery without implementing WP5.
+Version 0.4.6 implements the approved P1 nearest-voice-leading mode and clearer
+snapshot feedback. Version 0.4.7 repairs live scale-change observation and makes the
+detected scale visible without beginning WP5; Advanced holds, Secret Chords,
+performance snapshots, and split output remain separate future changes.

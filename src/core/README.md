@@ -3,8 +3,9 @@
 These ES5-compatible modules are the Push-independent musical engine:
 
 - `harmony.js` maps Live root-relative scale intervals to automatic chords, manual
-  qualities, extensions, inversions, and bass;
-- `state.js` owns momentary harmonic selection plus persistent voicing/bass state; and
+  qualities, extensions, inversions, nearest-voice-leading scores, and bass;
+- `state.js` owns momentary harmonic selection plus persistent voicing, Nearest
+  history, bass state, and exact chord metadata;
 - `active-notes.js` snapshots every physical owner, reference-counts shared pitches,
   and applies the same exact note/CC123 flush to focus, disable, reload, and teardown.
 
