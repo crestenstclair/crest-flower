@@ -1,16 +1,18 @@
 # Push Chord Grid
 
 Push Chord Grid is a generated Max for Live MIDI Effect targeting Ableton Live 12 and
-Push 3 Standalone. WP1 is accepted: the repository builds a minimal raw-MIDI
-passthrough device with one stored parameter, and both Live acceptance checks passed.
+Push 3 Standalone. WP1 and WP2 are accepted. The WP2 build dynamically discovers Push,
+owns its 8×8 pad matrix only while this device's track is selected, and reports every
+pad as an A1–H8 coordinate.
 
-Chord behavior is intentionally not implemented yet. WP2 begins only on a new user
-request. Push Standalone testing is deferred by user decision so the user does not have
-to switch repeatedly between modes.
+WP2 does not generate chords or notes. Incoming track MIDI still passes through
+unchanged, while grabbed Push pad events are shown on the device face for the hardware
+gate. Push Standalone testing remains deferred to WP6 by user decision.
 
 ## Build
 
-Requirements: Python 3.11+, Git, and network access for the one-time bootstrap.
+Requirements: Python 3.11+, Node 23.11.0, Git, and network access for the one-time
+bootstrap.
 
 ```bash
 make bootstrap
@@ -22,24 +24,24 @@ make package
 
 Outputs:
 
-- `dist/PushChordGrid.amxd` — WP1 load-test device
+- `dist/PushChordGrid.amxd` — self-contained WP2 matrix-spike device
 - `dist/manifest.json` — deterministic artifact metadata and checksum
-- `dist/PushChordGrid-WP1.zip` — ready-to-test bundle
+- `dist/PushChordGrid-WP2.zip` — ready-to-test bundle
 
-## Three-step load test
+## WP2 hardware test
 
-1. In Live 12, put an instrument after `PushChordGrid.amxd` on a MIDI track and play
-   notes. Expect unchanged pitch, velocity, channel, and other MIDI data.
-2. Change **Base Octave**, save the Set, close it, and reopen it. Expect the value to
-   be restored; it does not alter MIDI in this smoke build.
-3. Push Standalone testing is deferred. Preserve compatibility, but do not require a
-   mode switch for this infrastructure gate.
+1. In Live 12 with Push in Control Mode, load the device and select its track. Expect
+   `Status: matrix acquired` on the device.
+2. Press the four physical corner pads. Expect bottom-left A1, bottom-right H1,
+   top-left A8, and top-right H8; releases report velocity 0.
+3. Complete the focus, disable/re-enable, and Set-reload checks in
+   `docs/HARDWARE_TESTS.md`.
 
 Record the exact result in `docs/HARDWARE_TESTS.md`. Do not edit the device in Max.
 
 ## Status
 
-Automated validation proves the container type, passthrough graph, parameter storage,
-forbidden-object policy, empty dependency cache, manifest checksum, and reproducible
-generation. Live loading and MIDI passthrough remain human acceptance checks;
-standalone testing is deferred.
+WP2 was accepted on 2026-08-17. Its automated gate covers all 64 coordinate mappings,
+ownership-state logic, container and patch graph, embedded JavaScript completeness,
+forbidden-object policy, manifest checksum, and byte-for-byte reproducibility. The
+connected Push 3 hardware gate confirmed A1, H1, A8, and H8 plus lifecycle reacquisition.

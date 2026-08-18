@@ -6,9 +6,15 @@ from build.build_device import build_device
 from tools.inspect_amxd import read_amxd, validate_document
 
 
-def test_dependency_cache_is_empty(tmp_path: Path) -> None:
+def test_only_embedded_matrix_adapter_is_declared(tmp_path: Path) -> None:
     document = read_amxd(build_device(tmp_path / "device.amxd"))
-    assert document.patcher["patcher"]["dependency_cache"] == []
+    assert document.patcher["patcher"]["dependency_cache"] == [
+        {"name": "push-grid-adapter.js", "type": "TEXT", "implicit": 1}
+    ]
+    assert sorted(document.embedded_files) == [
+        "Push Chord Grid.amxd",
+        "push-grid-adapter.js",
+    ]
     assert validate_document(document) == []
 
 
@@ -28,17 +34,20 @@ def test_forbidden_object_is_rejected(tmp_path: Path) -> None:
 
     errors = validate_document(document)
     assert "forbidden runtime object: node.script" in errors
-    assert "undeclared WP1 newobj: node.script" in errors
+    assert "undeclared WP2 newobj: node.script" in errors
 
 
 def test_declared_external_dependency_is_rejected(tmp_path: Path) -> None:
     document = read_amxd(build_device(tmp_path / "device.amxd"))
-    document.patcher["patcher"]["dependency_cache"] = [
+    document.patcher["patcher"]["dependency_cache"].append(
         {"name": "external.mxo", "type": "iLaX"}
-    ]
+    )
 
     errors = validate_document(document)
-    assert any(error.startswith("runtime dependency cache is not empty") for error in errors)
+    assert any(
+        error.startswith("WP2 dependency cache does not exactly declare") for error in errors
+    )
+    assert "unembedded runtime dependencies: ['external.mxo']" in errors
 
 
 def test_generator_is_pinned_to_exact_commit() -> None:
@@ -47,4 +56,3 @@ def test_generator_is_pinned_to_exact_commit() -> None:
         "m4l-builder @ git+https://github.com/alaarab/m4l-builder.git"
         "@6c602b2861bf628d14fd39854d984b12de3cebff"
     ) in lockfile
-

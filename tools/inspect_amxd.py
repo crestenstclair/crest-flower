@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Parse and statically validate the generated WP1 AMXD artifact."""
+"""Parse and statically validate the generated WP2 AMXD artifact."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ import argparse
 import json
 import struct
 import sys
+from collections import Counter
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
@@ -16,11 +17,14 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from m4l_builder.freeze import extract_frozen_amxd  # noqa: E402
+
 from build.max_objects import (  # noqa: E402
     FORBIDDEN_OBJECTS,
     FORBIDDEN_PREFIXES,
-    WP1_ALLOWED_MAXCLASSES,
-    WP1_ALLOWED_NEWOBJS,
+    WP2_ALLOWED_MAXCLASSES,
+    WP2_ALLOWED_NEWOBJS,
+    WP2_EMBEDDED_RUNTIME_FILES,
 )
 
 AMXD_MAGIC = b"ampf"
@@ -40,6 +44,7 @@ class AmxdDocument:
     type_code: bytes
     metadata: bytes
     patcher: dict[str, Any]
+    embedded_files: dict[str, bytes]
 
 
 def read_amxd(path: Path | str) -> AmxdDocument:
@@ -70,7 +75,23 @@ def read_amxd(path: Path | str) -> AmxdDocument:
         raise AmxdValidationError(
             f"{artifact}: declared payload length ends at {payload_end}, file ends at {len(data)}"
         )
-    payload = data[payload_start:payload_end].rstrip(b"\x00\n")
+    raw_payload = data[payload_start:payload_end]
+    embedded_files: dict[str, bytes] = {}
+    if raw_payload.startswith(b"mx@c"):
+        try:
+            embedded_files = extract_frozen_amxd(data)
+        except ValueError as exc:
+            raise AmxdValidationError(f"{artifact}: invalid frozen payload: {exc}") from exc
+        device_entries = [
+            content for name, content in embedded_files.items() if name.lower().endswith(".amxd")
+        ]
+        if len(device_entries) != 1:
+            raise AmxdValidationError(
+                f"{artifact}: expected one embedded device JSON, found {len(device_entries)}"
+            )
+        payload = device_entries[0].rstrip(b"\x00\n")
+    else:
+        payload = raw_payload.rstrip(b"\x00\n")
     try:
         patcher = json.loads(payload.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
@@ -82,6 +103,7 @@ def read_amxd(path: Path | str) -> AmxdDocument:
         type_code=type_code,
         metadata=data[metadata_start:metadata_end],
         patcher=patcher,
+        embedded_files=embedded_files,
     )
 
 
@@ -112,12 +134,17 @@ def _root_patcher(document: AmxdDocument) -> dict[str, Any]:
 
 
 def validate_document(document: AmxdDocument) -> list[str]:
-    """Return all WP1 policy violations for a parsed document."""
+    """Return all WP2 policy violations for a parsed document."""
     errors: list[str] = []
     if document.version != AMXD_VERSION:
         errors.append(f"container version is {document.version}, expected {AMXD_VERSION}")
     if document.type_code != MIDI_EFFECT_CODE:
         errors.append(f"type code is {document.type_code!r}, expected {MIDI_EFFECT_CODE!r}")
+    frozen_marker = (
+        struct.unpack("<I", document.metadata)[0] if len(document.metadata) == 4 else None
+    )
+    if frozen_marker != 7:
+        errors.append("WP2 artifact is not frozen/self-contained")
 
     try:
         patcher = _root_patcher(document)
@@ -143,23 +170,57 @@ def validate_document(document: AmxdDocument) -> list[str]:
             name.startswith(prefix) for prefix in FORBIDDEN_PREFIXES
         ):
             errors.append(f"forbidden runtime object: {name}")
-        if maxclass not in WP1_ALLOWED_MAXCLASSES:
-            errors.append(f"undeclared WP1 maxclass: {maxclass}")
-        if maxclass == "newobj" and name not in WP1_ALLOWED_NEWOBJS:
-            errors.append(f"undeclared WP1 newobj: {name}")
+        if maxclass not in WP2_ALLOWED_MAXCLASSES:
+            errors.append(f"undeclared WP2 maxclass: {maxclass}")
+        if maxclass == "newobj" and name not in WP2_ALLOWED_NEWOBJS:
+            errors.append(f"undeclared WP2 newobj: {name}")
 
     dependencies = patcher.get("dependency_cache", [])
-    if dependencies:
-        errors.append(f"runtime dependency cache is not empty: {dependencies!r}")
+    declared_dependencies = {
+        str(dependency.get("name")) for dependency in dependencies if dependency.get("name")
+    }
+    embedded_dependencies = {
+        name for name in document.embedded_files if not name.lower().endswith(".amxd")
+    }
+    if declared_dependencies != WP2_EMBEDDED_RUNTIME_FILES:
+        errors.append(
+            "WP2 dependency cache does not exactly declare the matrix adapter: "
+            f"{sorted(declared_dependencies)}"
+        )
+    if embedded_dependencies != WP2_EMBEDDED_RUNTIME_FILES:
+        errors.append(
+            "WP2 frozen payload does not exactly embed the matrix adapter: "
+            f"{sorted(embedded_dependencies)}"
+        )
+    external_dependencies = declared_dependencies - embedded_dependencies
+    if external_dependencies:
+        errors.append(f"unembedded runtime dependencies: {sorted(external_dependencies)}")
 
-    by_text = {
-        str(box.get("text", "")): str(box.get("id"))
+    ids_by_text: dict[str, list[str]] = {}
+    for box in root_boxes:
+        if box.get("maxclass") == "newobj":
+            ids_by_text.setdefault(str(box.get("text", "")), []).append(str(box.get("id")))
+    actual_newobjs = Counter(
+        str(box.get("text", ""))
         for box in root_boxes
         if box.get("maxclass") == "newobj"
-    }
-    expected_newobjs = {"midiin", "midiout", "s ---pcg-base-octave"}
-    if set(by_text) != expected_newobjs:
-        errors.append(f"unexpected WP1 newobj graph: {sorted(by_text)}")
+    )
+    expected_newobjs = Counter(
+        {
+            "deferlow": 2,
+            "js push-grid-adapter.js": 1,
+            "live.thisdevice": 1,
+            "midiin": 1,
+            "midiout": 1,
+            "p push-native-adapter": 1,
+            "prepend enabled": 1,
+            "prepend initialized": 1,
+            "prepend set": 2,
+            "s ---pcg-base-octave": 1,
+        }
+    )
+    if actual_newobjs != expected_newobjs:
+        errors.append(f"unexpected WP2 newobj graph: {dict(sorted(actual_newobjs.items()))}")
 
     lines = [entry.get("patchline", {}) for entry in patcher.get("lines", [])]
     for line in lines:
@@ -169,9 +230,13 @@ def validate_document(document: AmxdDocument) -> list[str]:
             errors.append(f"patchline has unknown source: {source!r}")
         if destination not in root_ids:
             errors.append(f"patchline has unknown destination: {destination!r}")
+    def one_id(text: str) -> str | None:
+        matches = ids_by_text.get(text, [])
+        return matches[0] if len(matches) == 1 else None
+
     expected_midi_line = {
-        "source": [by_text.get("midiin"), 0],
-        "destination": [by_text.get("midiout"), 0],
+        "source": [one_id("midiin"), 0],
+        "destination": [one_id("midiout"), 0],
     }
     parameter_id = next(
         (str(box.get("id")) for box in root_boxes if box.get("varname") == "Base Octave"),
@@ -179,15 +244,58 @@ def validate_document(document: AmxdDocument) -> list[str]:
     )
     expected_parameter_line = {
         "source": [parameter_id, 0],
-        "destination": [by_text.get("s ---pcg-base-octave"), 0],
+        "destination": [one_id("s ---pcg-base-octave"), 0],
     }
     normalized_lines = [
         {"source": line.get("source"), "destination": line.get("destination")}
         for line in lines
     ]
-    expected_lines = [expected_parameter_line, expected_midi_line]
-    if normalized_lines != expected_lines:
-        errors.append("WP1 graph is not the exact parameter sink plus raw MIDI passthrough graph")
+    if (
+        expected_parameter_line not in normalized_lines
+        or expected_midi_line not in normalized_lines
+    ):
+        errors.append("WP2 graph does not preserve the parameter sink and raw MIDI passthrough")
+
+    required_edges = {
+        ("device-lifecycle", 0, "prepend-initialized", 0),
+        ("prepend-initialized", 0, "defer-initialized", 0),
+        ("defer-initialized", 0, "push-grid-adapter", 0),
+        ("device-lifecycle", 0, "push-native-adapter", 0),
+        ("device-lifecycle", 1, "prepend-enabled", 0),
+        ("prepend-enabled", 0, "defer-enabled", 0),
+        ("defer-enabled", 0, "push-grid-adapter", 0),
+        ("push-grid-adapter", 0, "prepend-pad-set", 0),
+        ("prepend-pad-set", 0, "last-pad-display", 0),
+        ("push-grid-adapter", 1, "prepend-status-set", 0),
+        ("prepend-status-set", 0, "matrix-status-display", 0),
+        ("push-grid-adapter", 2, "push-native-adapter", 1),
+        ("push-native-adapter", 0, "push-grid-adapter", 0),
+    }
+    actual_edges = {
+        (
+            str(line.get("source", [None, None])[0]),
+            line.get("source", [None, None])[1],
+            str(line.get("destination", [None, None])[0]),
+            line.get("destination", [None, None])[1],
+        )
+        for line in lines
+    }
+    if not required_edges.issubset(actual_edges):
+        errors.append("WP2 lifecycle/status graph is incomplete")
+    if len(lines) != 15:
+        errors.append(f"WP2 root graph has {len(lines)} patchlines, expected 15")
+
+    comments = {
+        str(box.get("id")): str(box.get("text"))
+        for box in root_boxes
+        if box.get("maxclass") == "live.comment"
+    }
+    expected_comments = {
+        "last-pad-display": "Pad: --",
+        "matrix-status-display": "Status: waiting for Live",
+    }
+    if comments != expected_comments:
+        errors.append(f"WP2 status displays are unexpected: {comments!r}")
 
     parameters = [box for box in boxes if box.get("parameter_enable") == 1]
     if len(parameters) != 1:
@@ -227,13 +335,22 @@ def validate_amxd(path: Path | str) -> AmxdDocument:
 def summary(document: AmxdDocument) -> dict[str, Any]:
     patcher = _root_patcher(document)
     boxes = list(iter_boxes(document.patcher))
+    declared_dependencies = {
+        str(dependency.get("name"))
+        for dependency in patcher.get("dependency_cache", [])
+        if dependency.get("name")
+    }
+    embedded_dependencies = {
+        name for name in document.embedded_files if not name.lower().endswith(".amxd")
+    }
     return {
         "path": str(document.path),
         "container_version": document.version,
         "type_code": document.type_code.decode("ascii", errors="replace"),
         "object_names": sorted(object_name(box) for box in boxes),
         "patchline_count": len(patcher.get("lines", [])),
-        "runtime_dependencies": patcher.get("dependency_cache", []),
+        "embedded_runtime_files": sorted(embedded_dependencies),
+        "runtime_dependencies": sorted(declared_dependencies - embedded_dependencies),
         "stored_parameters": sorted(
             str(box.get("varname")) for box in boxes if box.get("parameter_enable") == 1
         ),
@@ -254,7 +371,7 @@ def main() -> int:
     if args.as_json:
         print(json.dumps(result, indent=2, sort_keys=True))
     else:
-        print(f"valid WP1 AMXD: {args.artifact}")
+        print(f"valid WP2 AMXD: {args.artifact}")
     return 0
 
 

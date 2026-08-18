@@ -4,7 +4,7 @@ VENV_PYTHON := $(VENV)/bin/python
 VENV_PIP := $(VENV)/bin/pip
 ARTIFACT := dist/PushChordGrid.amxd
 MANIFEST := dist/manifest.json
-PACKAGE := dist/PushChordGrid-WP1.zip
+PACKAGE := dist/PushChordGrid-WP2.zip
 
 .PHONY: bootstrap test build validate package clean
 
@@ -13,6 +13,7 @@ bootstrap:
 	$(VENV_PIP) install --requirement requirements-dev.lock
 
 test:
+	node --test tests/js/*.test.js
 	$(VENV_PYTHON) -m pytest
 
 build:
@@ -27,4 +28,3 @@ package: build
 
 clean:
 	rm -f $(ARTIFACT) $(MANIFEST) $(PACKAGE)
-

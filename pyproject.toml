@@ -1,6 +1,6 @@
 [project]
 name = "push-chord-grid"
-version = "0.1.0"
+version = "0.2.0"
 description = "Generated Max for Live MIDI effect for Ableton Push 3"
 requires-python = ">=3.11"
 
@@ -14,4 +14,3 @@ line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
-

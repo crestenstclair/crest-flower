@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Create a deterministic ready-to-test WP1 zip bundle."""
+"""Create a deterministic ready-to-test WP2 zip bundle."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ if str(ROOT / "tools") not in sys.path:
 
 from validate_release import validate_release  # noqa: E402
 
-ARCHIVE_ROOT = "PushChordGrid-WP1"
+ARCHIVE_ROOT = "PushChordGrid-WP2"
 FIXED_ZIP_TIME = (1980, 1, 1, 0, 0, 0)
 
 
@@ -53,4 +53,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

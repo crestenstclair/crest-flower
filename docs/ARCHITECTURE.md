@@ -24,12 +24,19 @@ The generator normalizes Max project creation/modification timestamps to a fixed
 This removes host-irrelevant wall-clock metadata so independent builds produce the same
 AMXD bytes and checksum.
 
-## WP1 graph
+## WP2 graph
 
 ```text
 midiin ───────────────▶ midiout
 
 Base Octave ──────────▶ private Max send (stored value sink only)
+
+live.thisdevice ──▶ native Push bridge ──▶ push-grid-adapter.js
+       │              │       ▲                    │       │
+       │              │       └── own/release ─────┘       │
+       └──▶ initialized/enabled + selected-track observer   │
+                                                            ▼
+                                     last-pad and lifecycle displays
 ```
 
 The parameter's private send prevents an orphaned-control warning but is not connected
@@ -37,9 +44,33 @@ to the MIDI path. Raw MIDI byte passthrough is used instead of `notein`/`noteout
 not intentionally discard controller, pressure, pitch-bend, program, clock, or SysEx
 messages.
 
+The generated native bridge follows Live's public LOM message flow:
+`path live_app` → `property control_surfaces` → `zl iter 2` → `live.object gettype`.
+It selects `Push2` or `Push3`, resolves `Button_Matrix` with `call get_control`, and
+observes the matrix through `live.observer value`. Live assigns control-surface and
+control objects valid nonzero IDs that may be negative; the connected Push 3 was `-2`
+and its matrix was `-12`. Treating those IDs as positive-only was the discovery defect
+found during hardware integration.
+
+JavaScript compares `this_device canonical_parent` with
+`live_set.view.selected_track`; only the enabled instance on that track opens the native
+event gate and requests `call grab_control id <matrix-id>` on the Push surface object.
+Deselection and disable close the gate and call `release_control id <matrix-id>` on that
+same surface immediately. The native observer refreshes discovery on surface-list
+changes, and a one-second selected-track watchdog recovers after reload.
+
+Push matrix callbacks have the shape `value velocity x y ...`. Push's physical row 7
+is the bottom row, so chess rank is `8 - y`; file is `A + x`. The adapter stores the
+latest velocity in `GridState[x][y]`. WP2 sends normalized events only to the device
+display and does not emit MIDI or LED updates.
+
+The JavaScript is embedded in a reproducibly frozen AMXD. The dependency cache declares
+the script, the frozen footer contains exactly that script, and the manifest reports no
+unembedded runtime dependency.
+
 ## Future runtime boundaries
 
-After the WP1 gate, the planned runtime layers are Push discovery/grid ownership, focus
-management, Live scale observation, coordinate routing, deterministic harmony/state,
-active-note ownership, and MIDI output. Runtime dependencies remain limited to native
-Max, Max `js`, and the public Live Object Model.
+The implemented runtime boundary now includes Push discovery/grid ownership, focus
+management, and coordinate normalization. Live scale observation, deterministic
+harmony/state, active-note ownership, and generated MIDI remain future work. Runtime
+dependencies remain limited to native Max, Max `js`, and the public Live Object Model.

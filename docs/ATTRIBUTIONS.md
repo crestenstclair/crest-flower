@@ -16,6 +16,7 @@ runtime dependency of the Max for Live device.
 - Ableton Max for Live Production Guidelines: used to define validation policy.
 - Ableton Push 3 Standalone compatibility guidance: used to preserve the hardware gate
   and forbidden-dependency policy.
-- Expressive Chords, Tuple, and Push Grid MIDI remain future research references. No
-  code from them is included in WP0/WP1.
-
+- Tuple (MIT) was inspected during WP2 for its use of the public ControlSurface API and
+  its documented Push physical-row orientation. No Tuple source code is included.
+- Expressive Chords and Push Grid MIDI remain reference-only. No code from them is
+  included.

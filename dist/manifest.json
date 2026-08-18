@@ -1,10 +1,13 @@
 {
   "artifact": {
-    "bytes": 4626,
+    "bytes": 39508,
     "path": "PushChordGrid.amxd",
-    "sha256": "2220a84f14d9502e1931bd9388751ac605e4656a621ea9be19c9c4800606293f",
+    "sha256": "fc4a1cad98cb17687c65223994eb3d8e1c8c9f030f551687d16cad2a4a76ed7d",
     "type_code": "mmmm"
   },
+  "embedded_runtime_files": [
+    "push-grid-adapter.js"
+  ],
   "generator": {
     "commit": "6c602b2861bf628d14fd39854d984b12de3cebff",
     "name": "m4l-builder",
@@ -13,9 +16,9 @@
   "project": "push-chord-grid",
   "runtime_dependencies": [],
   "schema_version": 1,
-  "stage": "WP1",
+  "stage": "WP2",
   "stored_parameters": [
     "Base Octave"
   ],
-  "version": "0.1.0"
+  "version": "0.2.0"
 }
