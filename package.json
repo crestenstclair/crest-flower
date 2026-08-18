@@ -1,0 +1,13 @@
+{
+  "name": "push-chord-grid",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Development metadata for the future testable JavaScript core",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "python3 -m pytest"
+  }
+}
+
