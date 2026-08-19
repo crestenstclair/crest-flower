@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Interactive usage guide and approved feature direction for Push Chord Grid v0.5.1 RC.">
+  <meta name="description" content="Interactive usage guide and approved feature direction for Push Chord Grid v0.5.2 RC.">
   <title>Push Chord Grid — Usage &amp; Next Features</title>
   <style>
     :root {
@@ -737,7 +737,7 @@
         <p class="lede">Push Chord Grid turns the lower half of Push into four octaves of scale-correct chords. Live owns the key. You choose the degree, voicing, nearest movement, color, and bass.</p>
       </div>
       <aside class="hero-card" aria-label="Current build summary">
-        <div class="version"><strong>0.5.1 RC</strong><span>Push display + WP5 hardening</span></div>
+        <div class="version"><strong>0.5.2 RC</strong><span>Live holds + WP5 hardening</span></div>
         <div class="facts">
           <div class="fact">32 chord pads</div>
           <div class="fact">4 octaves</div>
@@ -871,7 +871,7 @@
             <p class="inspector-copy" id="inspect-copy">Plays the automatic tonic triad at Base Octave. In A natural minor that is A minor. Hold other chord pads freely; shared notes are safely reference-counted.</p>
             <div class="behavior">
               <span class="behavior-label">Output behavior</span>
-              <span class="behavior-value" id="inspect-behavior">MIDI trigger · pitch snapshot on press</span>
+              <span class="behavior-value" id="inspect-behavior">MIDI trigger · velocity-sensitive live hold</span>
             </div>
           </aside>
         </div>
@@ -881,8 +881,8 @@
     <section class="section" id="usage">
       <div class="shell">
         <div class="section-head">
-          <div><p class="kicker">Current usage</p><h2>Play harmony.<br>Shape the next hit.</h2></div>
-          <p class="section-intro">The surface separates harmonic choice from voicing. The current-state line begins with the detected Live scale, so a key change such as C Major → C Minor is immediately visible. Chord and extension controls are momentary; Voice, Nearest, and bass settings persist. A sounding chord never changes behind your back.</p>
+          <div><p class="kicker">Current usage</p><h2>Play harmony.<br>Shape it while it rings.</h2></div>
+          <p class="section-intro">The surface separates harmonic choice from voicing. The current-state line begins with the detected Live scale, so a key change such as C Major → C Minor is immediately visible. Chord and extension controls are momentary and always transform held chords; Voice, Nearest, and bass settings persist for future presses.</p>
         </div>
         <div class="panel usage-grid">
           <article class="usage-card">
@@ -898,13 +898,13 @@
           </article>
           <article class="usage-card">
             <span class="mini">QUALITY OVERRIDE</span>
-            <h3>Hold a type, then hit a chord</h3>
-            <p>Dim, Min, Maj, and Sus temporarily replace automatic quality. Release the control to return to scale-derived harmony. The control itself emits no MIDI note.</p>
+            <h3>Change the type before or during a chord</h3>
+            <p>Dim, Min, Maj, and Sus temporarily replace automatic quality for new and currently held chords. Release returns every hold to that pad’s press-time automatic harmony. The control itself emits no MIDI note.</p>
           </article>
           <article class="usage-card">
             <span class="mini">6 · m7 · M7 · 9</span>
             <h3>Extensions are additive—and combinable</h3>
-            <p>Hold one or more extension pads before striking a chord. Each adds its own root-relative tone: +9, +10, +11, or +14 semitones.</p>
+            <p>Hold one or more extension pads before or during a chord. Each adds its own root-relative tone: +9, +10, +11, or +14 semitones, and release removes it from sounding holds.</p>
             <div class="note-run"><span>C = 60 64 67</span><span>C6 +69</span><span>C7 +70</span><span>CM7 +71</span><span>Cadd9 +74</span></div>
           </article>
           <article class="usage-card">
@@ -923,9 +923,9 @@
             <p>Bass toggles the extra root on or off. Bass − and + move it by octaves; Bass −1 resets it to one octave beneath the chord root.</p>
           </article>
           <article class="usage-card">
-            <span class="mini">SAFE HOLDS</span>
-            <h3>Pressed notes are snapshots</h3>
-            <p>Modifiers, scale changes, and voicing changes affect future presses only. Focus loss, disable, Reload Grid, deletion, and Set close release every active note plus CC123.</p>
+            <span class="mini">LIVE HOLDS</span>
+            <h3>Change harmony while it rings</h3>
+            <p>Quality and 6/m7/M7/9 edges always update every held chord atomically, preserving each pad’s strike velocity and never retriggering a retained/shared pitch. Scale, Base Octave, Voice, Nearest, and bass changes still affect future presses only. Focus loss, disable, Reload Grid, deletion, and Set close release every active note plus CC123.</p>
           </article>
           <article class="usage-card">
             <span class="mini">RECOVERY</span>
@@ -946,7 +946,7 @@
           <article class="usage-card">
             <span class="mini">PUSH SCREEN · PLAYING</span>
             <h3>See the held chord without looking at Live</h3>
-            <p>Push’s first device bank shows Base Octave and Playing. Playing reports the newest held chord’s exact root, resolved quality, and complete 6/m7/M7/9 stack. Release the newest overlap and the previous held chord reappears; release the last chord or lose focus and it returns to --.</p>
+            <p>Push’s first device bank shows Base Octave and Playing, followed by six empty slots. Playing reports the newest held chord’s exact root, resolved quality, and complete 6/m7/M7/9 stack. Release the newest overlap and the previous held chord reappears; release the last chord or lose focus and it returns to --.</p>
             <div class="device-readout" aria-label="Example Push parameter bank"><span>Base Octave&nbsp;&nbsp;2</span><span>Playing&nbsp;&nbsp;Cm +m7+9</span></div>
           </article>
         </div>
@@ -958,7 +958,7 @@
       <div class="shell">
         <div class="section-head">
           <div><p class="kicker">Shipped + roadmap</p><h2>More expression.<br>No bloat.</h2></div>
-          <p class="section-intro">v0.5.1 includes the Push Playing display, Nearest voice leading, exact chord feedback, live scale-change detection, and duplicate-safe matrix ownership. The other cards are proposed or approved directions inspired by Orchid, kept separate from current behavior so you can see exactly what exists today and what may come next.</p>
+          <p class="section-intro">v0.5.2 includes always-live holds, the Push Playing display, Nearest voice leading, exact chord feedback, live scale-change detection, and duplicate-safe matrix ownership. The other cards remain proposed or approved directions inspired by Orchid, kept separate from current behavior so you can see exactly what exists today and what may come next.</p>
         </div>
 
         <div class="chain" aria-label="Recommended Ableton device chain">
@@ -973,7 +973,7 @@
 
         <div class="features">
           <article class="feature"><span class="feature-status">Implemented · 0.4.6</span><h3>Nearest voice leading</h3><p>D7 chooses the deterministic inversion requiring the least movement from the previous chord while preserving row and Voice intent.</p><span class="placement">Control: D7</span></article>
-          <article class="feature"><span class="feature-status">Approved · P2</span><h3>Advanced hold behavior</h3><p>An opt-in playstyle lets quality or extension controls safely mutate held chords. It would preserve exact ownership and never double-trigger a shared pitch.</p><span class="placement">Mode choice; Simple remains default</span></article>
+          <article class="feature"><span class="feature-status">Implemented · 0.5.2</span><h3>Live hold behavior</h3><p>Quality and extension changes always apply atomically to every held chord, preserving press context, velocity, and exact shared-note ownership.</p><span class="placement">Always active; no mode setting</span></article>
           <article class="feature"><span class="feature-status">Approved · P3</span><h3>Secret chord layer</h3><p>A reserved-row layer could expose useful colors beyond Dim/Min/Maj/Sus: augmented, power, quartal, minor-major, dominant, and user-selected formulas.</p><span class="placement">Candidate area: rank 6</span></article>
           <article class="feature"><span class="feature-status">Approved explore</span><h3>Performance snapshots</h3><p>Store and recall a few combinations of voicing, bass register, and extension state. This makes dramatic harmonic changes immediate without turning the grid into a menu.</p><span class="placement">Candidate area: reserved pads</span></article>
           <article class="feature"><span class="feature-status">Approved explore</span><h3>Separate bass output</h3><p>Optionally route the added bass voice separately from the chord voices so each can reach a different Live instrument or MIDI path.</p><span class="placement">Needs Standalone-safe routing design</span></article>
@@ -1001,7 +1001,7 @@
 
   <footer>
     <div class="shell footer-inner">
-      <span>Push Chord Grid v0.5.1 RC · Usage and approved-direction guide · 2026-08-18</span>
+      <span>Push Chord Grid v0.5.2 RC · Usage and approved-direction guide · 2026-08-18</span>
       <span class="footer-links"><a href="ORCHID_ADAPTATION.md">Orchid study</a><a href="HARDWARE_TESTS.md">Hardware card</a><a href="../README.md">Project README</a></span>
     </div>
   </footer>
@@ -1018,12 +1018,12 @@
 
       const descriptions = {
         quality: {
-          copy: "Hold this momentary quality override, then press a chord pad. It replaces automatic scale-derived quality for new chord presses and clears when released.",
-          behavior: "Silent control · affects future chord presses"
+          copy: "Hold this momentary quality override before or during a chord. It atomically transforms every held chord and returns each one to its press-time automatic quality when released.",
+          behavior: "Silent control · always live on held chords"
         },
         extension: {
-          copy: "Hold this momentary extension, alone or with other extensions, then press a chord pad. It adds one root-relative tone and clears when released.",
-          behavior: "Silent control · additive · combinable"
+          copy: "Hold this momentary extension, alone or with other extensions, before or during a chord. It adds or removes one root-relative tone on every held chord without retriggering retained pitches.",
+          behavior: "Silent control · additive · always live"
         },
         voice: {
           copy: "Changes persistent chord voicing for future presses. Down moves the highest tone lower, Up moves the lowest tone higher, and Reset returns to root position.",
@@ -1061,7 +1061,7 @@
           const chord = example.chords[degree - 1];
           title.textContent = `Degree ${degree} · ${chord}`;
           copy.textContent = `Plays the automatic ${degree === 1 || degree === 8 ? "tonic" : `degree ${degree}`} triad at ${pad.dataset.octave}. In ${example.label}, that is ${chord}. Multiple chord pads may overlap safely.`;
-          behavior.textContent = "MIDI trigger · velocity-sensitive pitch snapshot";
+          behavior.textContent = "MIDI trigger · velocity-sensitive live hold";
           return;
         }
 

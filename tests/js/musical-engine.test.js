@@ -211,11 +211,15 @@ test("nearest voice leading is opt-in, stateful, and publishes exact chord snaps
         rootPitch: 60,
         requestedQuality: "auto",
         resolvedQuality: "major",
+        automaticQuality: "major",
+        automaticChordPitches: [60, 64, 67],
         extensions: [],
         manualVoicing: 0,
         voiceLeadingEnabled: true,
         nearestAdjustment: 0,
         nearestScore: 0,
+        bassEnabled: false,
+        bassOctave: -1,
         chordPitches: [60, 64, 67],
         pitches: [60, 64, 67]
     });
@@ -278,6 +282,69 @@ test("snapshot quality resolves automatic and manual chord identities", () => {
     assert.equal(musicalState.chordSnapshotForPad(state, 1, 1).resolvedQuality, "suspended");
 });
 
+test("held chord snapshots retarget from immutable press context", () => {
+    const state = musicalState.createState({
+        rootNote: 9,
+        scaleIntervals: [0, 2, 3, 5, 7, 8, 10]
+    });
+    musicalState.setVoicing(state, 1);
+    musicalState.toggleBass(state);
+    musicalState.setBassOctave(state, -2);
+    const snapshot = musicalState.chordSnapshotForPad(state, 1, 1);
+    assert.equal(snapshot.automaticQuality, "minor");
+    assert.deepEqual(snapshot.automaticChordPitches, [69, 72, 76]);
+    assert.deepEqual(snapshot.pitches, [45, 72, 76, 81]);
+
+    musicalState.updateScale(state, 0, [0, 2, 4, 5, 7, 9, 11]);
+    const extensions = {
+        sixth: false,
+        minor_seventh: false,
+        major_seventh: false,
+        ninth: true
+    };
+    const majorNinth = musicalState.retargetChordSnapshot(snapshot, "major", extensions);
+    assert.deepEqual(majorNinth, {
+        rootPitch: 69,
+        requestedQuality: "major",
+        resolvedQuality: "major",
+        automaticQuality: "minor",
+        automaticChordPitches: [69, 72, 76],
+        extensions: ["ninth"],
+        manualVoicing: 1,
+        voiceLeadingEnabled: false,
+        nearestAdjustment: 0,
+        nearestScore: 0,
+        bassEnabled: true,
+        bassOctave: -2,
+        chordPitches: [73, 76, 81, 83],
+        pitches: [45, 73, 76, 81, 83]
+    });
+    const automatic = musicalState.retargetChordSnapshot(
+        majorNinth,
+        "auto",
+        {sixth: false, minor_seventh: false, major_seventh: false, ninth: false}
+    );
+    assert.equal(automatic.resolvedQuality, "minor");
+    assert.deepEqual(automatic.chordPitches, [72, 76, 81]);
+    assert.deepEqual(automatic.pitches, [45, 72, 76, 81]);
+});
+
+test("retargeting reapplies the exact press-time nearest adjustment", () => {
+    const state = musicalState.createState();
+    musicalState.toggleVoiceLeading(state);
+    musicalState.chordSnapshotForPad(state, 1, 1);
+    const snapshot = musicalState.chordSnapshotForPad(state, 1, 4);
+    assert.equal(snapshot.nearestAdjustment, -1);
+    const retargeted = musicalState.retargetChordSnapshot(snapshot, "minor", {
+        sixth: false,
+        minor_seventh: true,
+        major_seventh: false,
+        ninth: false
+    });
+    assert.equal(retargeted.nearestAdjustment, -1);
+    assert.deepEqual(retargeted.chordPitches, [63, 65, 68, 72]);
+});
+
 test("scale and octave updates affect future chord rows", () => {
     const state = musicalState.createState({baseOctave: 4});
     musicalState.updateScale(state, 4, [0, 2, 3, 5, 7, 8, 10]);
@@ -333,6 +400,63 @@ test("retriggering one physical owner releases its old snapshot before the new p
         noteOff(64), noteOff(67), noteOn(65, 120), noteOn(69, 120)
     ]);
     assert.deepEqual(active.normalizedPitches([60, 60, 64]), [60, 64]);
+});
+
+test("atomic owner retarget emits only the global pitch difference", () => {
+    const notes = active.createActiveNotes();
+    active.pressOwner(notes, "A1", [60, 63, 67], 88);
+    assert.deepEqual(active.retargetOwners(notes, [
+        {owner: "A1", pitches: [60, 64, 67], velocity: 88}
+    ]), [noteOff(63), noteOn(64, 88)]);
+    assert.equal(active.referenceCount(notes, 60), 1);
+    assert.equal(active.referenceCount(notes, 63), 0);
+    assert.equal(active.referenceCount(notes, 64), 1);
+    assert.deepEqual(active.releaseOwner(notes, "A1"), [
+        noteOff(60), noteOff(64), noteOff(67)
+    ]);
+});
+
+test("atomic retarget transfers shared pitches without a transient event", () => {
+    const notes = active.createActiveNotes();
+    active.pressOwner(notes, "A1", [60, 64], 40);
+    active.pressOwner(notes, "B1", [65, 69], 110);
+    assert.deepEqual(active.retargetOwners(notes, [
+        {owner: "A1", pitches: [60, 65], velocity: 40},
+        {owner: "B1", pitches: [64, 69], velocity: 110}
+    ]), []);
+    [60, 64, 65, 69].forEach((pitch) => assert.equal(active.referenceCount(notes, pitch), 1));
+});
+
+test("newest retarget owner supplies one velocity for a newly shared pitch", () => {
+    const notes = active.createActiveNotes();
+    active.pressOwner(notes, "A1", [60], 40);
+    active.pressOwner(notes, "B1", [62], 110);
+    assert.deepEqual(active.retargetOwners(notes, []), []);
+    assert.deepEqual(active.retargetOwners(notes, [
+        {owner: "A1", pitches: [60, 67], velocity: 40},
+        {owner: "B1", pitches: [62, 67], velocity: 110}
+    ]), [noteOn(67, 110)]);
+    assert.equal(active.referenceCount(notes, 67), 2);
+});
+
+test("invalid atomic retarget input leaves all ownership unchanged", () => {
+    const notes = active.createActiveNotes();
+    active.pressOwner(notes, "A1", [60, 64], 90);
+    const before = JSON.stringify(notes);
+    [
+        () => active.retargetOwners(notes, null),
+        () => active.retargetOwners(notes, [null]),
+        () => active.retargetOwners(notes, [{owner: "B1", pitches: [62], velocity: 80}]),
+        () => active.retargetOwners(notes, [
+            {owner: "A1", pitches: [60], velocity: 80},
+            {owner: "A1", pitches: [64], velocity: 90}
+        ]),
+        () => active.retargetOwners(notes, [{owner: "A1", pitches: [128], velocity: 80}]),
+        () => active.retargetOwners(notes, [{owner: "A1", pitches: [60], velocity: 0}])
+    ].forEach((operation) => {
+        assert.throws(operation);
+        assert.equal(JSON.stringify(notes), before);
+    });
 });
 
 test("panic always flushes exact notes in pitch order and finishes with CC123", () => {
@@ -401,6 +525,24 @@ test("invalid musical inputs fail deterministically", () => {
     assert.throws(() => musicalState.updateBaseOctave(state, 9), /base octave/);
     assert.throws(() => musicalState.createState({baseOctave: -1}), /base octave/);
     assert.throws(() => musicalState.createState({scaleIntervals: null}), /scale intervals/);
+    assert.throws(() => musicalState.retargetChordSnapshot(null, "auto", {}), /snapshot/);
+    assert.throws(
+        () => musicalState.retargetChordSnapshot({}, "power", {}),
+        /chord type/
+    );
+    assert.throws(
+        () => musicalState.retargetChordSnapshot({}, "auto", {}),
+        /automatic chord context/
+    );
+    const snapshot = musicalState.chordSnapshotForPad(state, 1, 1);
+    assert.throws(
+        () => musicalState.retargetChordSnapshot(snapshot, "auto", null),
+        /extensions/
+    );
+    assert.throws(
+        () => musicalState.retargetChordSnapshot(snapshot, "auto", {}),
+        /extension state/
+    );
     assert.throws(() => active.pressOwner(active.createActiveNotes(), "A1", [60], 0), /velocity/);
     assert.throws(() => active.pressOwner(active.createActiveNotes(), "", [60], 10), /owner/);
     assert.throws(() => active.pressOwner(active.createActiveNotes(), "A1", null, 10), /pitches/);

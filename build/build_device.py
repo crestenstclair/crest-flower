@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the self-contained WP4 Push Chord Grid Max for Live MIDI Effect."""
+"""Generate the self-contained Push Chord Grid v0.5.2 Max for Live MIDI Effect."""
 
 from __future__ import annotations
 

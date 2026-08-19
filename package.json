@@ -1,6 +1,6 @@
 {
   "name": "push-chord-grid",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "private": true,
   "description": "Development metadata for the testable Max JavaScript core",
   "engines": {

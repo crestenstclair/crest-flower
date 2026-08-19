@@ -77,7 +77,7 @@ def test_midi_graph_preserves_passthrough_and_adds_generated_midi(tmp_path: Path
     ]
 
 
-def test_base_octave_and_playing_display_are_stored_and_banked(tmp_path: Path) -> None:
+def test_only_base_octave_and_playing_are_stored_and_banked(tmp_path: Path) -> None:
     document = validate_amxd(build_device(tmp_path / "device.amxd"))
     patcher = document.patcher["patcher"]
     parameters = {
@@ -142,6 +142,10 @@ def test_matrix_adapter_is_embedded_exactly_and_artifact_is_frozen(tmp_path: Pat
             else "max"
         )
         assert embedded[filename] == Path("src", source_dir, filename).read_bytes()
+    runtime_source = embedded["runtime-adapter.js"].decode("utf-8")
+    assert "hold_mode" not in runtime_source
+    assert "setHoldMode" not in runtime_source
+    assert "holdMode" not in runtime_source
 
 
 def test_lifecycle_graph_initializes_and_tracks_device_enablement(tmp_path: Path) -> None:
@@ -192,6 +196,7 @@ def test_lifecycle_graph_initializes_and_tracks_device_enablement(tmp_path: Path
     assert texts["arbitration-receive"] == "receive push_chord_grid_arbitration"
     assert texts["enabled-select"] == "sel 1"
     assert texts["prepend-reload"] == "prepend reload"
+    assert "prepend-hold-mode" not in texts
 
     reload_button = next(
         entry["box"] for entry in patcher["boxes"] if entry["box"].get("id") == "reload-grid-button"
@@ -205,6 +210,8 @@ def test_lifecycle_graph_initializes_and_tracks_device_enablement(tmp_path: Path
     assert boxes["runtime-adapter"]["numoutlets"] == 6
     assert boxes["playing-display"]["active"] == 0
     assert boxes["playing-display"]["parameter_mappable"] == 0
+    assert "hold-mode" not in boxes
+    assert boxes["last-pad-display"]["presentation_rect"] == [105, 8, 583, 22]
     assert boxes["selection-display"]["text"] == (
         "Scale C Major | Chord: Auto | Voice 0 | Nearest off | Bass off | Ext -"
     )
@@ -276,9 +283,9 @@ def test_manifest_is_deterministic_and_matches_artifact(tmp_path: Path) -> None:
     manifest = json.loads(first_manifest.read_text(encoding="utf-8"))
     assert manifest["artifact"]["sha256"] == sha256(artifact)
     assert manifest["stage"] == "WP5"
-    assert manifest["version"] == "0.5.1"
+    assert manifest["version"] == "0.5.2"
     assert manifest["release_set"] == {
-        "path": "PushChordGrid-v0.5.1-RC.als",
+        "path": "PushChordGrid-v0.5.2-RC.als",
         "bytes": DEFAULT_LIVE_SET.stat().st_size,
         "sha256": sha256(DEFAULT_LIVE_SET),
     }
@@ -310,6 +317,12 @@ def test_reviewed_live_set_contains_playing_parameter() -> None:
     assert parameter.find("MinValue").get("Value") == "0"
     assert parameter.find("MaxValue").get("Value") == "960"
     assert parameter.find("Default").get("Value") == "0"
+    parameter_names = {
+        item.find("Name").get("Value")
+        for item in root.findall(".//MxDEnumParameter")
+        if item.find("Name") is not None
+    }
+    assert "Hold Mode" not in parameter_names
 
 
 def test_release_package_is_reproducible_and_complete(tmp_path: Path) -> None:
@@ -331,15 +344,15 @@ def test_release_package_is_reproducible_and_complete(tmp_path: Path) -> None:
     )
     with zipfile.ZipFile(first) as archive:
         assert archive.namelist() == [
-            "PushChordGrid-v0.5.1-RC/CHANGELOG.md",
-            "PushChordGrid-v0.5.1-RC/HARDWARE_TESTS.md",
-            "PushChordGrid-v0.5.1-RC/ORCHID_ADAPTATION.md",
-            "PushChordGrid-v0.5.1-RC/PushChordGrid-v0.5.1-RC.als",
-            "PushChordGrid-v0.5.1-RC/PushChordGrid.amxd",
-            "PushChordGrid-v0.5.1-RC/README.md",
-            "PushChordGrid-v0.5.1-RC/USAGE_GUIDE.html",
-            "PushChordGrid-v0.5.1-RC/manifest.json",
+            "PushChordGrid-v0.5.2-RC/CHANGELOG.md",
+            "PushChordGrid-v0.5.2-RC/HARDWARE_TESTS.md",
+            "PushChordGrid-v0.5.2-RC/ORCHID_ADAPTATION.md",
+            "PushChordGrid-v0.5.2-RC/PushChordGrid-v0.5.2-RC.als",
+            "PushChordGrid-v0.5.2-RC/PushChordGrid.amxd",
+            "PushChordGrid-v0.5.2-RC/README.md",
+            "PushChordGrid-v0.5.2-RC/USAGE_GUIDE.html",
+            "PushChordGrid-v0.5.2-RC/manifest.json",
         ]
-        assert archive.read("PushChordGrid-v0.5.1-RC/PushChordGrid-v0.5.1-RC.als") == (
+        assert archive.read("PushChordGrid-v0.5.2-RC/PushChordGrid-v0.5.2-RC.als") == (
             DEFAULT_LIVE_SET.read_bytes()
         )

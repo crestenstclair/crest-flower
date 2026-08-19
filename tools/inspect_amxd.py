@@ -268,19 +268,19 @@ def validate_document(document: AmxdDocument) -> list[str]:
         "source": [one_id("midiin"), 0],
         "destination": [one_id("midiout"), 0],
     }
-    parameter_id = next(
+    base_octave_id = next(
         (str(box.get("id")) for box in root_boxes if box.get("varname") == "Base Octave"),
         None,
     )
-    expected_parameter_line = {
-        "source": [parameter_id, 0],
+    expected_base_octave_line = {
+        "source": [base_octave_id, 0],
         "destination": [one_id("prepend base_octave"), 0],
     }
     normalized_lines = [
         {"source": line.get("source"), "destination": line.get("destination")} for line in lines
     ]
     if (
-        expected_parameter_line not in normalized_lines
+        expected_base_octave_line not in normalized_lines
         or expected_midi_line not in normalized_lines
     ):
         errors.append("WP5 graph does not preserve parameter input and raw MIDI passthrough")
@@ -416,7 +416,7 @@ def validate_document(document: AmxdDocument) -> list[str]:
     if bank.get("name") != "Push Chord Grid":
         errors.append("Push parameter bank 0 has the wrong name")
     if len(bank_parameters) != 8 or bank_parameters[:2] != ["Base Octave", "Playing"]:
-        errors.append("Base Octave and Playing are not in Push bank slots 0 and 1")
+        errors.append("Base Octave and Playing are not in Push bank slots 0-1")
     if any(value != "-" for value in bank_parameters[2:]):
         errors.append("unused Push parameter bank slots are not empty")
 

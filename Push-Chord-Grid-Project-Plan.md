@@ -24,8 +24,8 @@ coordinates and records the proposed harmonic feature set as approved direction.
 Version 0.4.5 adds automatic re-enable discovery and a safe manual Reload Grid path
 for stale matrix ownership after device or hardware cycling.
 Version 0.4.6 assigns D7 to persistent nearest voice leading and adds exact
-last-chord/inversion/extension/emitted-pitch feedback. Advanced held-chord mutation,
-Secret Chords, snapshots, and split output remain unimplemented separate changes.
+last-chord/inversion/extension/emitted-pitch feedback. Secret Chords, snapshots, and
+split output remain unimplemented separate changes.
 Version 0.4.7 normalizes LiveAPI's array-wrapped scale callbacks and shows the detected
 Live scale on the device face so post-load key changes are both applied and visible.
 
@@ -42,6 +42,12 @@ the public device parameter bank. It reports the newest held immutable chord sna
 including resolved quality and all 6/m7/M7/9 extensions, falls back through overlapping
 holds, and blanks after final release or lifecycle cleanup. It introduces no Remote
 Script, private Push API, runtime dependency, or musical-grid change.
+
+WP5 follow-up note (2026-08-18): v0.5.2 RC replaces immutable holds with one
+always-live behavior. Rank-8 quality and 6/m7/M7/9 edges atomically retarget every held
+chord while preserving press-time root/voicing/bass context and strike velocity.
+There is no Hold Mode setting. Retained and shared pitches never retrigger; all other
+state changes remain future-trigger-only.
 
 ## 1. Intent
 
@@ -497,6 +503,20 @@ Gate: Standalone acceptance completes v0 and authorizes the final release bundle
 - Validate exact enum codes, bank position, Max attributes, wiring, dependency closure,
   documentation, Live installation, and reproducible delivery.
 
+### WP5 follow-up — live hold behavior (implemented in 0.5.2)
+
+- Remove the legacy immutable/Simple hold path and expose no mode setting.
+- Apply actual Dim/Min/Maj/Sus and 6/m7/M7/9 press/release state changes to all
+  currently held chord owners as one transaction.
+- Rebuild each held owner from its press-time automatic triad, root, manual/Nearest
+  placement, bass choice, and physical strike velocity; do not consult later Live
+  scale, Base Octave, Voice, Nearest, or bass state.
+- Compare complete global pitch counts before and after the transaction. Emit note-off
+  only for a pitch becoming globally silent and note-on only for a newly sounding
+  pitch; retained or transferred shared pitches emit nothing.
+- Update Last, Playing, and enabled Nearest history to the newest retargeted hold.
+  Preserve exact release, overlap, duplicate arbitration, and lifecycle cleanup.
+
 ### WP4 follow-up — LED renderer (implemented in 0.4.1)
 
 The authorized follow-up implements the existing LED renderer interface with
@@ -529,12 +549,12 @@ work and is not part of this follow-up.
 - E8–H8 independently add 6/m7/M7/9 using Orchid's exact root-relative meanings.
 - A7/B7/C7 move the chord voicing down/reset/up by cascading the highest or lowest
   tone one octave. E7/F7/G7 do the same for bass register; H7 toggles bass.
-- The release implements Orchid's snapshot-oriented Simple playstyle. Held owners do
-  not mutate when modifiers are released, and momentary state clears on lifecycle
-  loss. Persistent voicing and bass state remains.
+- The original release implemented Orchid's snapshot-oriented Simple playstyle; v0.5.2
+  supersedes it with always-live quality and extension changes. Momentary state still
+  clears on lifecycle loss, while persistent voicing and bass state remains.
 - Orchid's synth engines, effects, beat machine, clock, and looper map to Live-native
   instruments, effects, tempo, Drum Rack, and Session clips. Timed performance modes,
-  Advanced/Free playstyles, secret chords, and separate MIDI streams remain explicit
+  Free playstyle retriggering, secret chords, and separate MIDI streams remain explicit
   follow-up candidates rather than being mixed into the safe harmonic engine.
 - The agent installed the final build in the existing MCP-created Live test Set,
   verified the new display and matrix acquisition, exercised focus reacquisition, and
@@ -550,7 +570,7 @@ work and is not part of this follow-up.
 - Apply the resolved velocity to every newly sounding pitch in the generated chord.
 - Preserve raw external MIDI passthrough, snapshot ownership, shared-pitch reference
   counts, lifecycle flushes, LEDs, and Standalone-compatible dependencies.
-- Nearest voice leading, Advanced held-chord behavior, Secret Chords, performance
+- Nearest voice leading, live held-chord behavior, Secret Chords, performance
   snapshots, split output exploration, and clearer feedback were approved product
   direction; v0.4.6 implements Nearest and clearer feedback only.
 

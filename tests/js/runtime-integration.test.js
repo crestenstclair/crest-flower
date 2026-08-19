@@ -116,7 +116,7 @@ test("four chord rows are octave-spaced and reject invalid velocities", () => {
     assert.throws(() => integration.processGridEvent(runtime, "A1", 128), /velocity/);
 });
 
-test("Orchid quality and extension pads are momentary snapshot modifiers", () => {
+test("Orchid quality and extension pads are momentary chord modifiers", () => {
     const runtime = integration.createRuntime();
     integration.processGridEvent(runtime, "B8", 100);
     integration.processGridEvent(runtime, "E8", 100);
@@ -132,6 +132,10 @@ test("Orchid quality and extension pads are momentary snapshot modifiers", () =>
         noteOn(70, 90), noteOn(71, 90), noteOn(74, 90)
     ]);
 
+    assert.deepEqual(integration.processGridEvent(runtime, "A1", 0), [
+        noteOff(60), noteOff(63), noteOff(67), noteOff(69),
+        noteOff(70), noteOff(71), noteOff(74)
+    ]);
     ["B8", "E8", "F8", "G8", "H8"].forEach((coordinate) => {
         assert.deepEqual(integration.processGridEvent(runtime, coordinate, 0), []);
     });
@@ -139,10 +143,6 @@ test("Orchid quality and extension pads are momentary snapshot modifiers", () =>
         integration.selectionText(runtime),
         "Scale C Major | Chord: Auto | Voice 0 | Nearest off | Bass off | Ext -"
     );
-    assert.deepEqual(integration.processGridEvent(runtime, "A1", 0), [
-        noteOff(60), noteOff(63), noteOff(67), noteOff(69),
-        noteOff(70), noteOff(71), noteOff(74)
-    ]);
 });
 
 test("last-held quality wins and releasing it restores the previous held quality", () => {
@@ -157,6 +157,133 @@ test("last-held quality wins and releasing it restores the previous held quality
     integration.processGridEvent(runtime, "A8", 0);
     integration.processGridEvent(runtime, "A8", 0);
     assert.equal(runtime.musical.chordType, "auto");
+});
+
+test("live held-chord behavior has no legacy mode state", () => {
+    const runtime = integration.createRuntime();
+    assert.equal("holdMode" in runtime, false);
+    assert.equal(integration.setHoldMode, undefined);
+    assert.equal(
+        integration.selectionText(runtime),
+        "Scale C Major | Chord: Auto | Voice 0 | Nearest off | Bass off | Ext -"
+    );
+});
+
+test("quality and extension edges always retarget held chords", () => {
+    const runtime = integration.createRuntime();
+    integration.processGridEvent(runtime, "A1", 88);
+    assert.deepEqual(integration.processGridEvent(runtime, "B8", 100), [
+        noteOff(64), noteOn(63, 88)
+    ]);
+    assert.deepEqual(integration.processGridEvent(runtime, "H8", 100), [noteOn(74, 88)]);
+    assert.deepEqual(runtime.notes.owners.$A1, [60, 63, 67, 74]);
+    assert.equal(integration.playingDisplayLabel(runtime), "Cm +9");
+    assert.equal(runtime.lastHoldMutation, true);
+    assert.deepEqual(integration.processGridEvent(runtime, "A1", 0), [
+        noteOff(60), noteOff(63), noteOff(67), noteOff(74)
+    ]);
+});
+
+test("quality press and release retarget an automatic minor hold", () => {
+    const runtime = integration.createRuntime({
+        rootNote: 9,
+        scaleIntervals: [0, 2, 3, 5, 7, 8, 10]
+    });
+    assert.deepEqual(integration.processGridEvent(runtime, "A1", 73), [
+        noteOn(69, 73), noteOn(72, 73), noteOn(76, 73)
+    ]);
+    assert.deepEqual(integration.processGridEvent(runtime, "C8", 100), [
+        noteOff(72), noteOn(73, 73)
+    ]);
+    assert.equal(runtime.lastHoldMutation, true);
+    assert.deepEqual(runtime.notes.owners.$A1, [69, 73, 76]);
+    assert.equal(integration.playingDisplayLabel(runtime), "A");
+    assert.match(integration.feedbackText(runtime), /^Last: A \| Quality Maj/);
+    assert.deepEqual(integration.processGridEvent(runtime, "C8", 80), []);
+    assert.equal(runtime.lastHoldMutation, false);
+    assert.deepEqual(integration.processGridEvent(runtime, "C8", 0), [
+        noteOff(73), noteOn(72, 73)
+    ]);
+    assert.deepEqual(runtime.notes.owners.$A1, [69, 72, 76]);
+    assert.equal(integration.playingDisplayLabel(runtime), "Am");
+});
+
+test("live 9ths retain each overlapping owner's physical velocity", () => {
+    const runtime = integration.createRuntime();
+    integration.processGridEvent(runtime, "A1", 40);
+    integration.processGridEvent(runtime, "C1", 110);
+    assert.deepEqual(integration.processGridEvent(runtime, "H8", 100), [
+        noteOn(74, 40), noteOn(78, 110)
+    ]);
+    assert.deepEqual(runtime.notes.owners.$A1, [60, 64, 67, 74]);
+    assert.deepEqual(runtime.notes.owners.$C1, [64, 67, 71, 78]);
+    assert.equal(integration.playingDisplayLabel(runtime), "Em +9");
+    assert.deepEqual(integration.processGridEvent(runtime, "H8", 0), [
+        noteOff(74), noteOff(78)
+    ]);
+});
+
+test("overlapping quality mutation is globally atomic", () => {
+    const runtime = integration.createRuntime({
+        rootNote: 0,
+        scaleIntervals: [0, 2, 3, 5, 7, 8, 10]
+    });
+    integration.processGridEvent(runtime, "A1", 40);
+    integration.processGridEvent(runtime, "C1", 110);
+    assert.deepEqual(integration.processGridEvent(runtime, "C8", 100), [
+        noteOn(64, 40)
+    ]);
+    assert.equal(runtime.notes.counts.$63, 1);
+    assert.equal(runtime.notes.counts.$67, 2);
+    assert.deepEqual(integration.processGridEvent(runtime, "C8", 0), [noteOff(64)]);
+    assert.equal(runtime.notes.counts.$63, 2);
+    assert.equal(runtime.notes.counts.$67, 2);
+});
+
+test("retrigger replaces the retained velocity for later live extensions", () => {
+    const runtime = integration.createRuntime({
+        rootNote: 9,
+        scaleIntervals: [0, 2, 3, 5, 7, 8, 10]
+    });
+    integration.processGridEvent(runtime, "C8", 100);
+    integration.processGridEvent(runtime, "A1", 55);
+    assert.deepEqual(integration.processGridEvent(runtime, "A1", 99), [
+        noteOff(69), noteOff(73), noteOff(76),
+        noteOn(69, 99), noteOn(73, 99), noteOn(76, 99)
+    ]);
+    assert.equal(runtime.activeChordVelocities.A1, 99);
+    assert.deepEqual(integration.processGridEvent(runtime, "H8", 100), [noteOn(83, 99)]);
+});
+
+test("lifecycle flushes a live held-chord replacement", () => {
+    const runtime = integration.createRuntime({
+        rootNote: 9,
+        scaleIntervals: [0, 2, 3, 5, 7, 8, 10]
+    });
+    integration.processGridEvent(runtime, "A1", 73);
+    integration.processGridEvent(runtime, "C8", 100);
+    assert.deepEqual(integration.processLifecycle(runtime, "focus_lost"), [
+        noteOff(69), noteOff(73), noteOff(76),
+        {type: "control_change", controller: 123, value: 0}
+    ]);
+    assert.equal("holdMode" in runtime, false);
+    assert.deepEqual(runtime.activeChordVelocities, Object.create(null));
+    assert.equal(integration.playingDisplayLabel(runtime), "--");
+    assert.equal(integration.feedbackText(runtime), "Last: --");
+});
+
+test("unrelated state changes do not retarget a held owner", () => {
+    const runtime = integration.createRuntime();
+    integration.processGridEvent(runtime, "A1", 91);
+    integration.applyScaleSnapshot(runtime, 9, [0, 2, 3, 5, 7, 8, 10]);
+    integration.processGridEvent(runtime, "C7", 100);
+    integration.processGridEvent(runtime, "D7", 100);
+    integration.processGridEvent(runtime, "H7", 100);
+    assert.deepEqual(runtime.notes.owners.$A1, [60, 64, 67]);
+    assert.deepEqual(runtime.activeChordSnapshots.A1.pitches, [60, 64, 67]);
+    assert.deepEqual(integration.processGridEvent(runtime, "A1", 0), [
+        noteOff(60), noteOff(64), noteOff(67)
+    ]);
 });
 
 test("voicing and bass controls persist and only step once per physical press", () => {
@@ -239,6 +366,20 @@ test("nearest mode follows the exact C major I-IV-V-I golden progression", () =>
     });
 });
 
+test("live held-chord mutation updates enabled Nearest history to the newest hold", () => {
+    const runtime = integration.createRuntime();
+    integration.processGridEvent(runtime, "D7", 100);
+    integration.processGridEvent(runtime, "D7", 0);
+    integration.processGridEvent(runtime, "A1", 50);
+    integration.processGridEvent(runtime, "D1", 90);
+    integration.processGridEvent(runtime, "B8", 100);
+    assert.deepEqual(
+        runtime.musical.voiceLeadingPitches,
+        runtime.activeChordSnapshots.D1.chordPitches
+    );
+    assert.deepEqual(runtime.lastChordSnapshot, runtime.activeChordSnapshots.D1);
+});
+
 test("last-chord feedback is the complete owner snapshot, including shared pitches", () => {
     const runtime = integration.createRuntime();
     assert.equal(integration.feedbackText(runtime), "Last: --");
@@ -303,7 +444,7 @@ test("Push Playing enum has exact deterministic chord labels and codes", () => {
     assert.equal(integration.playingDisplayLabelForSnapshot(null), "--");
 });
 
-test("Push Playing follows newest immutable overlapping hold and retrigger", () => {
+test("Push Playing follows newest live overlapping hold and retrigger", () => {
     const runtime = integration.createRuntime({
         rootNote: 0,
         scaleIntervals: [0, 2, 3, 5, 7, 8, 10]
@@ -318,10 +459,10 @@ test("Push Playing follows newest immutable overlapping hold and retrigger", () 
 
     integration.applyScaleSnapshot(runtime, 9, [0, 2, 3, 5, 7, 8, 10]);
     integration.processGridEvent(runtime, "H8", 100);
-    assert.equal(integration.playingDisplayLabel(runtime), "D#");
+    assert.equal(integration.playingDisplayLabel(runtime), "D# +9");
 
     integration.processGridEvent(runtime, "C1", 0);
-    assert.equal(integration.playingDisplayLabel(runtime), "Cm");
+    assert.equal(integration.playingDisplayLabel(runtime), "Cm +9");
     integration.processGridEvent(runtime, "A1", 99);
     assert.equal(integration.playingDisplayLabel(runtime), "Am +9");
     assert.equal(runtime.activeChordOrder.length, 1);
@@ -345,6 +486,7 @@ test("Push Playing ignores controls and clears on every lifecycle", () => {
         assert.equal(integration.playingDisplayCode(runtime), 0);
         assert.equal(integration.playingDisplayLabel(runtime), "--");
         assert.deepEqual(runtime.activeChordSnapshots, Object.create(null));
+        assert.deepEqual(runtime.activeChordVelocities, Object.create(null));
         assert.deepEqual(runtime.activeChordOrder, []);
     });
 });
@@ -488,6 +630,7 @@ test("lifecycle clears held modifiers but preserves voicing and bass selections"
     assert.equal(runtime.musical.extensions.ninth, false);
     assert.equal(runtime.musical.voicing, 1);
     assert.equal(runtime.musical.bassEnabled, true);
+    assert.equal("holdMode" in runtime, false);
     assert.equal(
         integration.selectionText(runtime),
         "Scale C Major | Chord: Auto | Voice 1 | Nearest off | Bass -1 | Ext -"

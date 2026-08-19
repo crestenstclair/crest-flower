@@ -1,4 +1,4 @@
-# WP5 v0.5.1 RC Live hardening and Push display acceptance card
+# WP5 v0.5.2 RC live-hold acceptance card
 
 Date: 2026-08-18
 
@@ -6,9 +6,9 @@ Live: 12.4.3
 
 Artifact: `dist/PushChordGrid.amxd`
 
-Release Set: `release/PushChordGrid-v0.5.1-RC Project/PushChordGrid-v0.5.1-RC.als`
+Release Set: `release/PushChordGrid-v0.5.2-RC Project/PushChordGrid-v0.5.2-RC.als`
 
-Package: `dist/PushChordGrid-v0.5.1-RC.zip`
+Package: `dist/PushChordGrid-v0.5.2-RC.zip`
 
 This card separates evidence the agent can obtain through tests, Live control, Set
 inspection, and recording from the one remaining observation that requires prolonged
@@ -17,7 +17,8 @@ physical contact with Push. No MCP-capable setup is delegated to the user.
 ## Release configuration
 
 - Track 1: **Push Chord Grid**, Base Octave 2, followed by MIDI Monitor and Live's
-  Arpeggiator; first Push bank shows **Base Octave** followed by read-only **Playing**.
+  Arpeggiator; first Push bank shows **Base Octave**, read-only **Playing**, then six
+  empty slots.
 - Track 2: **Chord Instrument (Drift)**, armed, Monitor **In**, MIDI From **Push Chord
   Grid / Post FX**, one stock Drift instrument.
 - Live scale: **C Minor**.
@@ -25,14 +26,15 @@ physical contact with Push. No MCP-capable setup is delegated to the user.
   obsolete WP1 device remains in the release Set.
 - Push Standalone is intentionally not part of this WP5 card; it remains WP6.
 
-## Agent-owned evidence — passed
+## Agent-owned evidence
 
 | Gate | Exact result |
 | --- | --- |
 | Coordinate contract | All 64 coordinates have exactly one role: 32 chord pads, 16 silent controls, and 16 silent reserved pads. |
 | Musical vectors | C Major, A natural minor, and D Dorian degree 1–8 vectors pass across four octave rows, including 6/m7/M7/9, manual Voice, Nearest, bass, velocity, and exact release. |
 | Playing vectors | The complete 961-value table is exact and unique: `--` plus 12 roots × 5 resolved qualities × 16 extension masks. Newest-held overlap, release fallback, retrigger, held scale/control changes, and all lifecycle blanks pass. |
-| Push bank contract | Static AMXD validation finds exactly **Base Octave**, **Playing**, and six empty slots. Playing is inactive, non-mappable, driven only through `set`, and has no outgoing musical connection. |
+| Live-hold vectors | Always-live manual-to-auto restoration, all 9th/quality edges, press-time scale/Voice/Nearest/bass context, per-owner velocity, atomic shared-pitch transfer, retrigger, Last/Playing synchronization, and lifecycle cleanup pass exact vectors. |
+| Push bank contract | Static AMXD validation finds exactly **Base Octave**, **Playing**, and six empty slots. Playing is inactive/non-mappable; no hold-style parameter or runtime handler exists. |
 | Lifecycle | Focus loss, disable, reload, deletion, Set close, and owner transfer flush exact active snapshots followed by CC123. |
 | Sustained stress | A deterministic 1,800-second equivalent sequence produced more than 10,000 matched events with no unmatched notes, owners, or reference counts. |
 | Duplicate owner | Two same-track devices showed one `matrix acquired` and one `duplicate standby`; the standby emitted no grid music. |
@@ -45,9 +47,9 @@ physical contact with Push. No MCP-capable setup is delegated to the user.
 | Session recording | A destination Session clip captured exact repeated C3, E♭3, G3 Post-FX notes at velocity 72; the clip was inspected and deleted. |
 | Arrangement recording | Arrangement Record captured exact C3, E♭3, G3 Post-FX notes; the main clip and take lane were removed. |
 | Restart/reload | Live was saved, quit, relaunched, and the RC Set reopened. It showed two tracks, C Minor, Base Octave 2, intact Drift routing, and `matrix acquired`. |
-| Saved display state | The reopened ALS contains exactly one `Playing` enum parameter with index 1, range 0–960, and default 0; MIDI Monitor and Live's downstream Arpeggiator remained intact. |
+| Saved parameter state | The reviewed ALS contains exactly the compatible Base Octave and Playing state and no obsolete hold-style parameter. |
 | Runtime closure | The frozen AMXD embeds exactly six declared JavaScript files and reports no external runtime dependency. |
-| Reproducibility | Clean AMXD, manifest, ZIP, and checksum generation is byte-for-byte reproducible; package inventory is exact. |
+| Reproducibility | Clean AMXD generation and release packaging are byte-for-byte reproducible with exact manifest inventory. |
 
 ## Physical-only duration observation — pending
 
@@ -57,12 +59,23 @@ chord rows, the Dim/Min/Maj/Sus controls, 6/m7/M7/9 controls, Voice/Nearest/bass
 controls, soft and hard chord strikes, overlapping holds, focus changes, and at least
 one Reload Grid. Also observe this exact screen sequence with Live still in C Minor:
 
-1. With no chord held, **Playing** reads `--`.
-2. Hold A1: **Playing** reads `Cm`.
-3. While A1 remains held, press C1: **Playing** reads `D#`.
-4. Release C1: **Playing** returns to `Cm`; release A1: it returns to `--`.
-5. Hold Min + m7 + 9, then press A1: **Playing** reads `Cm +m7+9`.
-6. Change focus or use Reload Grid while holding: notes end and **Playing** reads `--`.
+1. Confirm the first bank contains **Base Octave**, **Playing**, then six empty slots;
+   **Playing** reads `--`.
+2. Hold A1: **Playing** reads `Cm`. Press Maj: the held chord changes to C major and
+   Playing reads `C`. Release Maj: it
+   returns to the original C minor and Playing reads `Cm`.
+3. While A1 remains held, press C1 with a clearly different strike strength, then hold
+   9: both chords gain a ninth and Playing reads `D# +9`. Release 9: both ninths end;
+   release C1 and Playing returns to `Cm`.
+4. Repeat step 3 with a soft A1 and hard C1. The new ninth voices follow the respective
+   pad dynamics; no shared C/E-flat/G voice doubles or blips during the control edge.
+5. While overlapping chords ring, exercise Dim/Min/Maj/Sus and 6/m7/M7/9 press/release
+   edges; each change is immediate and release restores the press-time automatic chord.
+6. Change Live scale, Base Octave, Voice, Nearest, and bass during a hold; none of these
+   unrelated changes retargets the currently sounding owner.
+7. Release A1: Playing returns to `--`. Change focus or use Reload Grid during another
+   hold: all notes end, the grid recovers, and Playing reads `--`.
+8. Sample all four chord rows and all rank-7/8 controls; no Hold Mode control appears.
 
 The passing result is:
 
@@ -70,6 +83,8 @@ The passing result is:
 - strike dynamics remain audible through chord velocity;
 - no chord/control press doubles because of ownership;
 - every overlapping hold releases exactly;
+- quality/extension changes on held chords are always immediate;
+- retained/shared pitches do not audibly retrigger during a modifier edge;
 - the Push **Playing** sequence above is legible and exact;
 - no stuck note, dark unrecoverable grid, or ownership failure occurs.
 
@@ -79,7 +94,8 @@ The passing result is:
 
 ## WP5 disposition
 
-All automatable and Live-side v0.5.1 RC gates pass. WP5 hardware acceptance remains
-open only for the unchecked physical 30-minute observation above. Do not infer it from
-the deterministic stress run. WP6 Standalone integration must not begin until this
-result is recorded.
+All source, automated, artifact, dependency, package, and installed-byte v0.5.2 gates
+pass. The release Set already has the exact two-parameter inventory required by the
+corrected device. WP5 hardware acceptance remains open only for the unchecked physical
+30-minute observation above. Do not infer it from the deterministic stress run. WP6
+Standalone integration must not begin until this result is recorded.

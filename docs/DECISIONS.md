@@ -195,10 +195,9 @@
   an octave, matching Orchid's inversion principle. E7/F7/G7 control bass register;
   H7 toggles a root bass voice. Bass is MIDI in the same output stream and its sound
   remains the responsibility of the downstream Live instrument.
-- **Playstyle:** Implement Simple snapshot semantics. Momentary modifiers affect the
-  next chord and clear on ownership loss; sounding owners keep exact snapshots.
-  Voicing and bass selections persist. Advanced/Free mutation is deferred until it has
-  lifecycle and shared-pitch acceptance vectors.
+- **Playstyle at v0.4.3:** Implement snapshot semantics pending lifecycle and
+  shared-pitch acceptance vectors. This behavior was explicitly superseded and removed
+  by the v0.5.2 always-live held-chord decision below.
 - **Live-native boundary:** Orchid's synths, effects, beats, BPM, and looping map to
   Live instruments/effects, Drum Rack, Set tempo, and Session clips. Timed Strum/Slop/
   Arp/Pattern/Harp need a cancellable scheduler and are not mixed into v0.4.3.
@@ -245,15 +244,14 @@
 
 ## 2026-08-18 — harmonic feature direction approved
 
-- **Decision:** The user approved the proposed direction: nearest voice leading,
-  optional Advanced held-chord mutation, a Secret Chord layer, performance snapshots,
+- **Decision at that time:** The user approved the proposed direction: nearest voice
+  leading, live held-chord mutation, a Secret Chord layer, performance snapshots,
   exploration of separate bass/chord output, and clearer chord feedback.
 - **Status:** Product direction only. No proposed coordinate assignment is active and
   every currently reserved pad remains silent until a separate implementation request
   defines and accepts the behavior.
-- **Priority:** Nearest voice leading, Advanced hold behavior, and Secret Chords retain
-  the guide's P1/P2/P3 ordering. Snapshot, routing, and feedback work remain approved
-  exploration rather than committed implementation scope.
+- **Later disposition:** Nearest and live held-chord behavior are implemented. Secret
+  Chords, snapshots, and routing remain separate future work.
 
 ## 2026-08-18 — explicit grid recovery after device or hardware cycling
 
@@ -286,8 +284,8 @@
 - **Feedback:** A dedicated device line derives chord root/name, resolved quality,
   extensions, inversion decision, and note-name/MIDI-number list from the exact owner
   snapshot, including shared pitches that did not need a repeated note-on.
-- **Scope:** Version 0.4.6 implements only approved Nearest and feedback work on WP4.
-  Advanced holds, Secret Chords, performance snapshots, split output, WP5, and WP6
+- **Scope at v0.4.6:** This release implemented only Nearest and feedback. Live holds
+  followed in v0.5.2; Secret Chords, performance snapshots, split output, and WP6
   remain unstarted.
 
 ## 2026-08-18 — normalize live scale observer callbacks
@@ -369,3 +367,26 @@
   `MxDEnumParameter` named `Playing` with range 0–960 and default 0. A complete Live
   quit/relaunch reopened the exact parent release Set while preserving MIDI Monitor,
   Live's downstream Arpeggiator, the Drift route, and the selected source track.
+
+## 2026-08-18 — always-live held-chord behavior
+
+- **Authorization:** The user explicitly requested live held-chord mutation, then
+  explicitly removed the legacy immutable/Simple mode and its setting.
+- **Single behavior:** No Hold Mode exists in runtime, Live, or Push. Every actual
+  quality or extension state edge uses live mutation, so a saved Set cannot restore
+  the discarded behavior.
+- **Mutation boundary:** Only actual Dim/Min/Maj/Sus or 6/m7/M7/9 state edges mutate
+  held chords. Live scale, Base Octave, Voice, Nearest, and bass remain
+  future-trigger-only.
+- **Context:** Each press stores its automatic triad/quality, manual and Nearest
+  placement, bass state, and physical velocity. Returning to Auto restores that exact
+  press-time diatonic chord even if Live's scale changed during the hold.
+- **Atomicity:** All held owners are validated and replaced together. MIDI is the
+  sorted global count difference, so a retained or transferred shared pitch emits no
+  note-off or note-on. A newly shared pitch emits once using the newest contributing
+  owner's retained velocity.
+- **Feedback and cleanup:** Last, Playing, and enabled Nearest history follow the
+  newest committed hold. Existing lifecycle paths flush the new snapshots/velocities,
+  emit exact note-offs plus CC123, with no hidden hold-style state retained.
+- **Delivery:** This follow-up is v0.5.2 RC and introduces no coordinate change,
+  Remote Script, private Push API, runtime dependency, or WP6 Standalone gate.

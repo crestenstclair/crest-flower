@@ -1,7 +1,7 @@
 # Orchid capability study and Push adaptation
 
 Research date: 2026-08-17  
-Implemented slice: Push Chord Grid v0.5.0 RC
+Implemented slice: Push Chord Grid v0.5.2 RC
 
 ## Source record
 
@@ -60,8 +60,8 @@ copying Orchid's enclosure, synth presets, or menu structure.
 | Chord voicing dial | A7/B7/C7 move down/reset/up; D7 toggles deterministic Nearest mode | Implemented |
 | Chord feedback | Device face names the chord, quality/extensions, inversion, and exact MIDI snapshot | Implemented |
 | Bass engine and voicing | H7 adds a root bass voice; E7/F7/G7 move down/reset/up by octave | Implemented as MIDI; sound comes from Live |
-| Simple playstyle | Chord pitch snapshot is fixed at note-on and modifiers affect future chords | Implemented |
-| Advanced/Free playstyles | Safe live mutation of held owners without duplicate or stuck notes | Proposed follow-up; Simple remains default |
+| Simple playstyle | Chord pitch snapshot is fixed at note-on and modifiers affect future chords | Superseded and removed in 0.5.2 |
+| Advanced/Free playstyles | Safe live mutation of held owners without duplicate or stuck notes | Quality/extensions are always live in 0.5.2; Free retrigger rules are excluded |
 | Strum/Arp | Downstream Ableton MIDI devices after Push Chord Grid | Explicitly outside this device |
 | Slop/Pattern/Harp and other timed transforms | Downstream Ableton MIDI devices where useful | Not proposed unless the Live workflow reveals a gap |
 | Three synth engines and sounds | Any Push Standalone-compatible Live instrument after the MIDI effect | Live-native |
@@ -91,7 +91,8 @@ chooses the lowest-scoring inversion within one rotation of that pad's row and m
 Voice baseline. Scoring is symmetric across every prior and candidate chord tone,
 bass is excluded, and ties prefer the smallest adjustment then the lower signed step.
 The device face shows the resolved chord, extensions, inversion decision, and exact
-emitted note-name/MIDI-number snapshot. Sounding owners retain Simple semantics.
+emitted note-name/MIDI-number snapshot. Version 0.5.2 supersedes the original immutable
+hold semantics described here.
 
 Version 0.4.7 corrects post-load Live scale observation by normalizing LiveAPI's
 single-array callback shape. The current-state line now names the detected Live scale,
@@ -102,18 +103,22 @@ devices now resolve to one device-order owner; standby copies emit no matrix lig
 or grid-generated music, and every ownership transfer flushes notes and LEDs before
 reacquisition. This changes project reliability, not Orchid-derived musical behavior.
 
+Version 0.5.2 removes the legacy hold mode. Quality and extension edges always apply
+to every sounding chord as one global owner transaction, preserving
+press-time automatic harmony, inversion/bass placement, and strike velocity. Pitches
+that remain globally owned emit no event. Free playstyle retrigger rules are not
+copied; other controls stay future-trigger-only.
+
 ## Remaining proposed follow-ups
 
 The user approved this remaining proposal set as product direction. It is intentionally
 harmonic rather than rhythmic and remains unimplemented until separately requested:
 
-1. Add an opt-in Advanced hold behavior that safely applies quality or extension
-   changes to sounding chords while Simple snapshot behavior remains the default.
-2. Use a deliberate layer of reserved pads for Secret Chords such as augmented,
+1. Use a deliberate layer of reserved pads for Secret Chords such as augmented,
    power, quartal, minor-major, and dominant colors.
-3. Explore recallable performance snapshots for voicing, bass register, and extension
+2. Explore recallable performance snapshots for voicing, bass register, and extension
    state.
-4. Explore Standalone-compatible separation of bass and chord MIDI paths.
+3. Explore Standalone-compatible separation of bass and chord MIDI paths.
 
 Possible pad placements are design notes, not assigned coordinate roles. Reserved pads
 remain silent until a proposal is accepted, implemented, documented, and covered by

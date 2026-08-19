@@ -132,12 +132,13 @@ All six JavaScript runtime files are embedded in the reproducibly frozen AMXD.
 
 ### Push playing display
 
-`runtime-adapter.js` keeps a coordinate-keyed map of the same immutable snapshots
-used for musical presses plus a newest-held order. Its sixth outlet emits a
+`runtime-adapter.js` keeps a coordinate-keyed map of the exact sounding owner
+snapshots plus a newest-held order. Its sixth outlet emits a
 deterministic code whenever a chord is pressed, retriggered, released, or flushed.
 Code 0 is `--`; codes 1–960 cover 12 roots, five resolved qualities, and all 16
 6/m7/M7/9 masks. Releasing the newest overlap exposes the previous stored snapshot,
-so current controls or scale changes cannot relabel a chord that is still sounding.
+so future-trigger-only controls or scale changes cannot relabel a chord that is still
+sounding; live quality/extension edges update every stored sounding snapshot.
 
 The generated graph sends the code through `prepend set` to an inactive,
 non-mappable `live.tab` named **Playing**. The first Push bank is exactly **Base
@@ -146,6 +147,25 @@ bank rather than a private control-surface notification or Remote Script. The
 `live.tab` has no outgoing patchline and cannot affect MIDI, LEDs, ownership, or
 harmony state. Lifecycle cleanup clears the active display map and emits `--` along
 with the existing note/LED release.
+
+### Live held-chord transaction
+
+There is no hold-mode state, handler, or generated parameter. Every actual rank-8
+quality and extension state change retargets sounding owners. Live scale, Base Octave,
+Voice, Nearest, and bass changes do not retarget a sounding owner.
+
+Every press snapshot retains the automatic root-position triad and quality plus its
+manual voicing, exact Nearest adjustment, bass choice, and physical strike velocity.
+Rebuilding selects the stored automatic triad or the current fixed quality,
+adds the current 6/m7/M7/9 mask, reapplies the stored placement and bass, then submits
+all active owners to `active-notes.js` together.
+
+The active-note manager validates every replacement before mutation, computes the
+complete prospective owner/count maps, and emits the sorted global difference. A
+pitch present before and after emits nothing even if ownership moves between chords.
+When several owners introduce the same silent pitch, the newest-held owner supplies
+the one note-on velocity. The committed snapshots drive Last and Playing, and the
+newest chord-tone array becomes enabled Nearest history for the next press.
 
 ## WP5 Live hardening
 
@@ -170,7 +190,7 @@ matrix, and repaint one complete frame. Standby instances show `duplicate standb
 receive no gated matrix events, and emit no grid-generated MIDI or LED commands.
 
 The reviewed WP5 Set is a binary release input at
-`release/PushChordGrid-v0.5.1-RC Project/PushChordGrid-v0.5.1-RC.als`. It contains one
+`release/PushChordGrid-v0.5.2-RC Project/PushChordGrid-v0.5.2-RC.als`. It contains one
 source chain—Push Chord Grid, MIDI Monitor, then Live's Arpeggiator—and one armed,
 Monitor-In Drift destination fed from the source's Post FX MIDI. The manifest hashes
 both AMXD and Set. Deterministic packaging copies their
@@ -209,14 +229,14 @@ the smallest absolute adjustment and then the lower signed adjustment. Bass is a
 after selection and cannot steer the inversion. Mode/manual-voicing/scale/Base Octave
 changes and lifecycle flushes clear history; ordinary release does not.
 
-`state.js` owns only future-trigger state: Live scale, Base Octave, momentary chord
+`state.js` owns future-trigger state plus the pure snapshot-retarget helper: Live scale, Base Octave, momentary chord
 type/extensions, persistent chord/Nearest/bass voicing, and the prior chord-tone
 snapshot. The generated snapshot also carries root, resolved quality, extensions,
 inversion adjustment, chord tones, and final pitches to the dedicated feedback line.
-`runtime-adapter.js` separately indexes those immutable snapshots while they are held
+`runtime-adapter.js` separately indexes those snapshots while they are held
 for the Push **Playing** display; ordinary release removes only active display state
-and leaves last-chord feedback intact. A held pad's pitch array is copied
-into `active-notes.js`; later state changes therefore cannot change its release. Each
+and leaves last-chord feedback intact. Quality/extension edges atomically replace the
+stored owner and snapshot; other musical state remains future-trigger-only. Each
 pitch is emitted on the first
 owner transition from zero to one and released on the last transition from one to zero.
 A repeated press from the same owner releases its old snapshot before taking the new

@@ -129,7 +129,9 @@ function createRuntime(options) {
         scaleMode: 1,
         lastChordSnapshot: null,
         activeChordSnapshots: emptyMap(),
-        activeChordOrder: []
+        activeChordVelocities: emptyMap(),
+        activeChordOrder: [],
+        lastHoldMutation: false
     };
 }
 
@@ -146,6 +148,7 @@ function removeCoordinate(values, coordinate) {
 }
 
 function updateQualityControl(runtime, coordinate, pressed) {
+    var previous = runtime.musical.chordType;
     if (pressed && !runtime.controlHeld[coordinate]) {
         runtime.controlHeld[coordinate] = true;
         runtime.heldQualities[coordinate] = QUALITY_CONTROLS[coordinate];
@@ -161,18 +164,53 @@ function updateQualityControl(runtime, coordinate, pressed) {
         runtime.musical,
         last === null ? "auto" : runtime.heldQualities[last]
     );
+    return previous !== runtime.musical.chordType;
 }
 
 function updateMomentaryExtension(runtime, coordinate, pressed) {
+    var extension = EXTENSION_CONTROLS[coordinate];
+    var previous = runtime.musical.extensions[extension];
     runtime.controlHeld[coordinate] = pressed;
     if (!pressed) {
         delete runtime.controlHeld[coordinate];
     }
     runtimeMusicalState.setExtension(
         runtime.musical,
-        EXTENSION_CONTROLS[coordinate],
+        extension,
         pressed
     );
+    return previous !== runtime.musical.extensions[extension];
+}
+
+function retargetHeldChords(runtime) {
+    if (runtime.activeChordOrder.length === 0) {
+        return [];
+    }
+    var replacements = [];
+    var snapshots = emptyMap();
+    runtime.activeChordOrder.forEach(function (coordinate) {
+        var snapshot = runtimeMusicalState.retargetChordSnapshot(
+            runtime.activeChordSnapshots[coordinate],
+            runtime.musical.chordType,
+            runtime.musical.extensions
+        );
+        snapshots[coordinate] = snapshot;
+        replacements.push({
+            owner: coordinate,
+            pitches: snapshot.pitches,
+            velocity: runtime.activeChordVelocities[coordinate]
+        });
+    });
+    var events = runtimeActiveNotes.retargetOwners(runtime.notes, replacements);
+    runtime.activeChordOrder.forEach(function (coordinate) {
+        runtime.activeChordSnapshots[coordinate] = snapshots[coordinate];
+    });
+    var newest = runtime.activeChordOrder[runtime.activeChordOrder.length - 1];
+    runtime.lastChordSnapshot = runtime.activeChordSnapshots[newest];
+    if (runtime.musical.voiceLeadingEnabled) {
+        runtime.musical.voiceLeadingPitches = runtime.lastChordSnapshot.chordPitches.slice();
+    }
+    return events;
 }
 
 function updateSteppedControl(runtime, coordinate, role, pressed) {
@@ -212,15 +250,25 @@ function processGridEvent(runtime, coordinate, velocity) {
     var normalizedVelocity = checkedVelocity(velocity);
     var pressed = normalizedVelocity > 0;
     var snapshot;
+    var changed;
+    runtime.lastHoldMutation = false;
     if (role === "reserved") {
         return [];
     }
     if (role === "quality_control") {
-        updateQualityControl(runtime, coordinate, pressed);
+        changed = updateQualityControl(runtime, coordinate, pressed);
+        if (changed && runtime.activeChordOrder.length > 0) {
+            runtime.lastHoldMutation = true;
+            return retargetHeldChords(runtime);
+        }
         return [];
     }
     if (role === "extension_control") {
-        updateMomentaryExtension(runtime, coordinate, pressed);
+        changed = updateMomentaryExtension(runtime, coordinate, pressed);
+        if (changed && runtime.activeChordOrder.length > 0) {
+            runtime.lastHoldMutation = true;
+            return retargetHeldChords(runtime);
+        }
         return [];
     }
     if (
@@ -235,6 +283,7 @@ function processGridEvent(runtime, coordinate, velocity) {
     if (!pressed) {
         delete runtime.held[coordinate];
         delete runtime.activeChordSnapshots[coordinate];
+        delete runtime.activeChordVelocities[coordinate];
         runtime.activeChordOrder = removeCoordinate(runtime.activeChordOrder, coordinate);
         return runtimeActiveNotes.releaseOwner(runtime.notes, coordinate);
     }
@@ -248,9 +297,11 @@ function processGridEvent(runtime, coordinate, velocity) {
     if (snapshot !== null) {
         runtime.lastChordSnapshot = snapshot;
         runtime.activeChordSnapshots[coordinate] = snapshot;
+        runtime.activeChordVelocities[coordinate] = normalizedVelocity;
         runtime.activeChordOrder.push(coordinate);
     } else {
         delete runtime.activeChordSnapshots[coordinate];
+        delete runtime.activeChordVelocities[coordinate];
     }
     return runtimeActiveNotes.pressOwner(
         runtime.notes,
@@ -267,7 +318,9 @@ function processLifecycle(runtime, lifecycle) {
     runtime.qualityOrder = [];
     runtime.lastChordSnapshot = null;
     runtime.activeChordSnapshots = emptyMap();
+    runtime.activeChordVelocities = emptyMap();
     runtime.activeChordOrder = [];
+    runtime.lastHoldMutation = false;
     runtimeMusicalState.resetMomentaryModifiers(runtime.musical);
     return runtimeActiveNotes.flushForLifecycle(runtime.notes, lifecycle);
 }
@@ -579,6 +632,9 @@ function grid_event(coordinate, velocity) {
     if (role === "chord") {
         emitFeedback();
         emitPlaying();
+    } else if (maxRuntime.lastHoldMutation) {
+        emitFeedback();
+        emitPlaying();
     }
     emitLedEvents(renderLedDiff(maxRuntime));
 }
@@ -649,6 +705,7 @@ if (typeof module !== "undefined" && module.exports) {
         processGridEvent: processGridEvent,
         processLifecycle: processLifecycle,
         renderLedDiff: renderLedDiff,
+        retargetHeldChords: retargetHeldChords,
         roleForCoordinate: roleForCoordinate,
         selectionText: selectionText,
         setLedOwnership: setLedOwnership

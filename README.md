@@ -1,7 +1,7 @@
 # Push Chord Grid
 
 Push Chord Grid is a generated Max for Live MIDI Effect for Ableton Live 12 and Push
-3. The v0.5.1 release candidate hardens the accepted musical surface for ordinary
+3. The v0.5.2 release candidate hardens the accepted musical surface for ordinary
 Live use while preserving Push 3 Standalone compatibility for the deferred WP6 gate.
 
 The lower four rows are four octave-spaced chord keyboards. A–H play scale degrees
@@ -11,10 +11,12 @@ manual or nearest inversion, and an optional root bass. Physical pad velocity dr
 every newly sounding chord voice. Strum and Arp intentionally remain downstream
 Ableton MIDI-device jobs.
 
-Push's first device bank now shows **Base Octave** and a device-owned **Playing**
+Push's first device bank shows **Base Octave** and a device-owned **Playing**
 value. Playing identifies the newest held chord with its resolved quality and complete
 6/m7/M7/9 stack, falls back to the previous chord during overlapping holds, and
-returns to `--` after the final release or lifecycle cleanup.
+returns to `--` after the final release or lifecycle cleanup. Quality and extension
+changes always transform sounding chords atomically; there is no Hold Mode and
+retained/shared pitches do not retrigger.
 
 Held pads retain exact pitch snapshots, shared pitches are reference-counted, and
 focus/disable/reload/deletion/Set-close lifecycles release every active note plus
@@ -46,11 +48,11 @@ Generated outputs:
 - `dist/PushChordGrid.amxd` — self-contained WP5 MIDI effect
 - `dist/manifest.json` — artifact and release-Set metadata, hashes, and dependency closure
 - `dist/PushChordGrid.amxd.sha256` — install-artifact checksum
-- `dist/PushChordGrid-v0.5.1-RC.zip` — deterministic release-candidate bundle
-- `dist/PushChordGrid-v0.5.1-RC.zip.sha256` — bundle checksum
+- `dist/PushChordGrid-v0.5.2-RC.zip` — deterministic release-candidate bundle
+- `dist/PushChordGrid-v0.5.2-RC.zip.sha256` — bundle checksum
 
 The bundle includes the reviewed two-track Live Set from
-`release/PushChordGrid-v0.5.1-RC Project/PushChordGrid-v0.5.1-RC.als`: one Push Chord
+`release/PushChordGrid-v0.5.2-RC Project/PushChordGrid-v0.5.2-RC.als`: one Push Chord
 Grid source followed by MIDI Monitor and Live's Arpeggiator, plus one armed,
 Monitor-In Drift destination receiving Post-FX MIDI. It
 also includes the offline [usage guide](docs/USAGE_GUIDE.html), exact
@@ -63,17 +65,20 @@ Automated tests cover all 64 coordinate roles, silent controls/reserved pads, ex
 golden MIDI vectors, scale changes, velocity, overlapping snapshots, lifecycle
 flushes, multi-instance isolation, duplicate arbitration, and a deterministic
 30-minute-equivalent sequence with more than 10,000 matched events. Display vectors
-cover every enum value, extensions, retriggers, overlap fallback, and lifecycle blanking. The deterministic
+cover every enum value, extensions, retriggers, overlap fallback, and lifecycle blanking.
+Live-hold vectors cover manual-to-auto restoration, 9ths, per-owner velocity, atomic
+shared-pitch transfer, retrigger, Nearest history, and lifecycle cleanup. The deterministic
 core retains 100% line, branch, and function coverage. Static validation enforces the
 exact generated graph, read-only Push bank, frozen runtime inventory, no undeclared dependency, and
 byte-for-byte build/package reproducibility.
 
-Live 12.4.3 evidence covers duplicate/reorder/disable/focus ownership transfer, C
+The inherited Live 12.4.3 evidence covers duplicate/reorder/disable/focus ownership transfer, C
 Major → A Minor scale propagation, stock Drift and temporary External Instrument
 routing, exact Session and Arrangement Post-FX recordings, cleanup, and a full Live
 quit/reopen of the clean Set. It reopened at C Minor, Base Octave 2, with one matrix
-owner, the v0.5.1 `Playing` parameter, the downstream MIDI devices, and the Drift
-route intact.
+owner, the `Playing` parameter, the downstream MIDI devices, and the Drift route
+intact. The v0.5.2 AMXD keeps that exact two-parameter inventory, so no obsolete hold
+setting is saved in the release Set.
 
 Only the irreducible physical 30-minute Push performance observation remains pending
 on the WP5 hardware card. Push 3 Standalone transfer and cold-boot acceptance remain

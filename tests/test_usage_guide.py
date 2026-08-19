@@ -47,13 +47,18 @@ def test_usage_guide_is_complete_offline_and_coordinate_exact() -> None:
     assert "Shipped + roadmap" in source
     assert "Your strike shapes the whole chord" in source
     assert "Implemented · 0.4.6" in source
-    assert "v0.5.1" in source
+    assert "v0.5.2" in source
     assert "duplicate standby" in source
     assert "Reload Grid" in source
     assert "Scale C Minor | Chord: Auto | Voice 0 | Nearest on | Bass off | Ext 9" in source
     assert "Last: Fm | Quality Min | Ext 9 | Inv VL -1" in source
     assert "PUSH SCREEN · PLAYING" in source
     assert "Playing&nbsp;&nbsp;Cm +m7+9" in source
+    assert "Hold Mode" not in source
+    assert "Choose Simple or Advanced" not in source
+    assert "always transform held chords" in source
+    assert "Implemented · 0.5.2" in source
+    assert "never retriggering a retained/shared pitch" in source
     assert "Release the newest overlap and the previous held chord reappears" in source
     assert (
         "Changing Voice, Live’s scale, Base Octave, Nearest mode, or lifecycle focus "

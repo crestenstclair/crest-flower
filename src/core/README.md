@@ -5,9 +5,10 @@ These ES5-compatible modules are the Push-independent musical engine:
 - `harmony.js` maps Live root-relative scale intervals to automatic chords, manual
   qualities, extensions, inversions, nearest-voice-leading scores, and bass;
 - `state.js` owns momentary harmonic selection plus persistent voicing, Nearest
-  history, bass state, and exact chord metadata;
+  history, bass state, exact chord metadata, and pure press-context retargeting;
 - `active-notes.js` snapshots every physical owner, reference-counts shared pitches,
-  and applies the same exact note/CC123 flush to focus, disable, reload, and teardown.
+  atomically replaces multiple owners from one global pitch diff, and applies the same
+  exact note/CC123 flush to focus, disable, reload, and teardown.
 
 The core emits plain event data. WP4's `runtime-adapter.js` connects it to the proven
 matrix adapter and native Max MIDI output. Development tests use Node, but the artifact

@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.5.2 — 2026-08-18
+
+- Remove the legacy immutable hold path and expose no Hold Mode setting.
+- Atomically retarget every held chord on actual Dim/Min/Maj/Sus and
+  6/m7/M7/9 edges while preserving press-time auto harmony, voicing/Nearest, bass, and
+  strike velocity.
+- Emit only the complete global pitch-count difference, so retained and transferred
+  shared notes never retrigger and a newly shared pitch sounds once.
+- Keep Live scale, Base Octave, Voice, Nearest, and bass changes future-trigger-only.
+- Synchronize Playing, Last, Nearest history, exact release, overlaps, retrigger, and
+  every lifecycle cleanup with the committed sounding owner snapshots.
+- Extend golden runtime/core vectors, static AMXD checks, documentation, hardware
+  checklist, deterministic package, manifest, and checksums for v0.5.2 RC.
+
 ## 0.5.1 — 2026-08-18
 
 - Add a device-owned **Playing** enum to Push bank slot 2, beside **Base Octave**.

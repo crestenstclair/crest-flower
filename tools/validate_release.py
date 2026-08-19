@@ -15,7 +15,7 @@ try:
 except ImportError:  # Direct script execution.
     from inspect_amxd import AmxdValidationError, summary, validate_amxd
 
-PROJECT_VERSION = "0.5.1"
+PROJECT_VERSION = "0.5.2"
 BUILD_STAGE = "WP5"
 GENERATOR_NAME = "m4l-builder"
 GENERATOR_VERSION = "0.8.0"
@@ -24,8 +24,8 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_LIVE_SET = (
     ROOT
     / "release"
-    / "PushChordGrid-v0.5.1-RC Project"
-    / "PushChordGrid-v0.5.1-RC.als"
+    / "PushChordGrid-v0.5.2-RC Project"
+    / "PushChordGrid-v0.5.2-RC.als"
 )
 
 

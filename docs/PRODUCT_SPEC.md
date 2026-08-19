@@ -5,7 +5,7 @@ The complete product contract is maintained in
 records the currently implemented slice so future work cannot accidentally cross the
 hardware gate.
 
-## Current slice: WP5 v0.5.1 release candidate
+## Current slice: WP5 v0.5.2 release candidate
 
 The proven matrix adapter and pure musical engine are now integrated. The generated
 device provides:
@@ -19,6 +19,7 @@ device provides:
 - exact last-chord identity, inversion, extension, and emitted-pitch feedback;
 - visible detected Live root/scale feedback on the current-state line;
 - a Push-native `Playing` value for the newest held exact chord snapshot;
+- always-live atomic held quality/extension mutation, with no legacy mode setting;
 - exact input-velocity propagation;
 - held-pad pitch snapshots and shared-pitch reference counting;
 - exact release plus CC123 flushing for panic and every ownership-loss lifecycle;
@@ -48,7 +49,8 @@ The generated artifact is a Max for Live MIDI Effect with:
 - raw MIDI passthrough from `midiin` to `midiout`;
 - one stored integer parameter named **Base Octave**, defaulting to 3;
 - one inactive, non-mappable enumerated **Playing** display, defaulting to `--`;
-- first-bank Push entries for **Base Octave** and **Playing**;
+- first-bank Push entries for **Base Octave** and **Playing**, followed by six empty
+  slots;
 - a momentary **Reload Grid** button for safe manual release, rediscovery,
   reacquisition, and repaint;
 - dynamic discovery of the active Push-family control surface by its public
@@ -107,7 +109,9 @@ scale visible.
 
 WP5 automated, dependency, duplicate-instance, routing, recording, cleanup, and Live
 restart/reload gates pass for v0.5.0 RC. Version 0.5.1 adds the exact active-chord Push
-display without changing that accepted ownership or musical behavior. The reviewed Set contains one Push Chord Grid
+display without changing that accepted ownership or musical behavior. Version 0.5.2
+replaces immutable holds with always-live quality/extension mutation using atomic
+global pitch diffs and exposes no mode setting. The reviewed Set contains one Push Chord Grid
 source followed by MIDI Monitor and Live's Arpeggiator, plus one armed Monitor-In
 Drift destination fed from Post FX. A deterministic
 30-minute-equivalent regression produces more than 10,000 exactly matched note events.
