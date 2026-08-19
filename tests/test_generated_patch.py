@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+import gzip
 import json
+import xml.etree.ElementTree as ET
 import zipfile
 from pathlib import Path
 
 from m4l_builder.freeze import extract_frozen_amxd
 
-from build.build_device import REPRODUCIBLE_TIMESTAMP, build_device
-from build.package_release import package_release
+from build.build_device import REPRODUCIBLE_TIMESTAMP, build_device, playing_display_labels
+from build.package_release import DEFAULT_LIVE_SET, package_release
 from tools.inspect_amxd import MIDI_EFFECT_PROJECT_TYPE, read_amxd, summary, validate_amxd
 from tools.validate_release import sha256, validate_release
 
@@ -23,6 +25,7 @@ def test_generated_artifact_is_valid_midi_effect(tmp_path: Path) -> None:
     assert object_names.count("live.object") == 2
     assert object_names.count("live.observer") == 2
     assert object_names.count("live.path") == 1
+    assert object_names.count("live.tab") == 1
     assert object_names.count("js") == 3
     assert object_names.count("p") == 1
     assert object_names.count("midiformat") == 1
@@ -74,12 +77,17 @@ def test_midi_graph_preserves_passthrough_and_adds_generated_midi(tmp_path: Path
     ]
 
 
-def test_base_octave_is_stored_and_banked(tmp_path: Path) -> None:
+def test_base_octave_and_playing_display_are_stored_and_banked(tmp_path: Path) -> None:
     document = validate_amxd(build_device(tmp_path / "device.amxd"))
     patcher = document.patcher["patcher"]
-    parameter = next(
-        entry["box"] for entry in patcher["boxes"] if entry["box"].get("parameter_enable") == 1
-    )
+    parameters = {
+        entry["box"]["varname"]: entry["box"]
+        for entry in patcher["boxes"]
+        if entry["box"].get("parameter_enable") == 1
+    }
+    assert set(parameters) == {"Base Octave", "Playing"}
+
+    parameter = parameters["Base Octave"]
     valueof = parameter["saved_attribute_attributes"]["valueof"]
 
     assert parameter["maxclass"] == "live.dial"
@@ -87,9 +95,22 @@ def test_base_octave_is_stored_and_banked(tmp_path: Path) -> None:
     assert valueof["parameter_initial"] == [3]
     assert valueof["parameter_mmin"] == 0
     assert valueof["parameter_mmax"] == 8
+
+    playing = parameters["Playing"]
+    playing_valueof = playing["saved_attribute_attributes"]["valueof"]
+    assert playing["maxclass"] == "live.tab"
+    assert playing["active"] == 0
+    assert playing["parameter_mappable"] == 0
+    assert playing_valueof["parameter_type"] == 2
+    assert playing_valueof["parameter_initial"] == [0]
+    assert playing_valueof["parameter_mmin"] == 0
+    assert playing_valueof["parameter_mmax"] == 960
+    assert playing_valueof["parameter_enum"] == playing_display_labels()
+    assert len(playing_valueof["parameter_enum"]) == 961
+    assert playing_valueof["parameter_enum"][27] == "Cm +m7+9"
     assert patcher["parameters"]["parameterbanks"]["0"]["parameters"] == [
         "Base Octave",
-        "-",
+        "Playing",
         "-",
         "-",
         "-",
@@ -151,13 +172,16 @@ def test_lifecycle_graph_initializes_and_tracks_device_enablement(tmp_path: Path
         (["thru_midiin", 0], ["push-midi-parse", 0]),
         (["push-midi-parse", 0], ["prepend-pad-velocity", 0]),
         (["prepend-pad-velocity", 0], ["push-grid-adapter", 0]),
+        (["arbitration-receive", 0], ["push-grid-adapter", 0]),
         (["live-scale-adapter", 0], ["runtime-adapter", 0]),
         (["runtime-adapter", 0], ["generated-midi-format", 0]),
         (["runtime-adapter", 1], ["generated-midi-format", 2]),
         (["generated-midi-format", 0], ["thru_midiout", 0]),
         (["runtime-adapter", 3], ["push-native-adapter", 2]),
         (["runtime-adapter", 4], ["prepend-feedback-set", 0]),
+        (["runtime-adapter", 5], ["prepend-playing-set", 0]),
         (["prepend-feedback-set", 0], ["feedback-display", 0]),
+        (["prepend-playing-set", 0], ["playing-display", 0]),
     ]
     for source, destination in required:
         assert {"source": source, "destination": destination} in lines
@@ -165,6 +189,7 @@ def test_lifecycle_graph_initializes_and_tracks_device_enablement(tmp_path: Path
     texts = {entry["box"].get("id"): entry["box"].get("text") for entry in patcher["boxes"]}
     assert texts["push-midi-parse"] == "midiparse"
     assert texts["prepend-pad-velocity"] == "prepend pad_velocity"
+    assert texts["arbitration-receive"] == "receive push_chord_grid_arbitration"
     assert texts["enabled-select"] == "sel 1"
     assert texts["prepend-reload"] == "prepend reload"
 
@@ -177,7 +202,9 @@ def test_lifecycle_graph_initializes_and_tracks_device_enablement(tmp_path: Path
     assert reload_button["presentation_rect"] == [12, 90, 78, 22]
 
     boxes = {entry["box"].get("id"): entry["box"] for entry in patcher["boxes"]}
-    assert boxes["runtime-adapter"]["numoutlets"] == 5
+    assert boxes["runtime-adapter"]["numoutlets"] == 6
+    assert boxes["playing-display"]["active"] == 0
+    assert boxes["playing-display"]["parameter_mappable"] == 0
     assert boxes["selection-display"]["text"] == (
         "Scale C Major | Chord: Auto | Voice 0 | Nearest off | Bass off | Ext -"
     )
@@ -248,8 +275,13 @@ def test_manifest_is_deterministic_and_matches_artifact(tmp_path: Path) -> None:
     assert first_manifest.read_bytes() == second_manifest.read_bytes()
     manifest = json.loads(first_manifest.read_text(encoding="utf-8"))
     assert manifest["artifact"]["sha256"] == sha256(artifact)
-    assert manifest["stage"] == "WP4"
-    assert manifest["version"] == "0.4.7"
+    assert manifest["stage"] == "WP5"
+    assert manifest["version"] == "0.5.1"
+    assert manifest["release_set"] == {
+        "path": "PushChordGrid-v0.5.1-RC.als",
+        "bytes": DEFAULT_LIVE_SET.stat().st_size,
+        "sha256": sha256(DEFAULT_LIVE_SET),
+    }
     assert manifest["embedded_runtime_files"] == [
         "active-notes.js",
         "harmony.js",
@@ -261,6 +293,25 @@ def test_manifest_is_deterministic_and_matches_artifact(tmp_path: Path) -> None:
     assert manifest["runtime_dependencies"] == []
 
 
+def test_reviewed_live_set_contains_playing_parameter() -> None:
+    with gzip.open(DEFAULT_LIVE_SET, "rb") as handle:
+        root = ET.fromstring(handle.read())
+
+    playing = [
+        parameter
+        for parameter in root.findall(".//MxDEnumParameter")
+        if parameter.find("Name") is not None
+        and parameter.find("Name").get("Value") == "Playing"
+    ]
+    assert len(playing) == 1
+    parameter = playing[0]
+    assert parameter.find("Index").get("Value") == "1"
+    assert parameter.find("Type").get("Value") == "2"
+    assert parameter.find("MinValue").get("Value") == "0"
+    assert parameter.find("MaxValue").get("Value") == "960"
+    assert parameter.find("Default").get("Value") == "0"
+
+
 def test_release_package_is_reproducible_and_complete(tmp_path: Path) -> None:
     artifact = build_device(tmp_path / "PushChordGrid.amxd")
     manifest = tmp_path / "manifest.json"
@@ -269,13 +320,26 @@ def test_release_package_is_reproducible_and_complete(tmp_path: Path) -> None:
     second = package_release(artifact, manifest, tmp_path / "second.zip")
 
     assert first.read_bytes() == second.read_bytes()
+    assert (tmp_path / "PushChordGrid.amxd.sha256").read_text(encoding="ascii") == (
+        f"{sha256(artifact)}  PushChordGrid.amxd\n"
+    )
+    assert (tmp_path / "first.zip.sha256").read_text(encoding="ascii") == (
+        f"{sha256(first)}  first.zip\n"
+    )
+    assert (tmp_path / "second.zip.sha256").read_text(encoding="ascii") == (
+        f"{sha256(second)}  second.zip\n"
+    )
     with zipfile.ZipFile(first) as archive:
         assert archive.namelist() == [
-            "PushChordGrid-WP4/CHANGELOG.md",
-            "PushChordGrid-WP4/HARDWARE_TESTS.md",
-            "PushChordGrid-WP4/ORCHID_ADAPTATION.md",
-            "PushChordGrid-WP4/PushChordGrid.amxd",
-            "PushChordGrid-WP4/README.md",
-            "PushChordGrid-WP4/USAGE_GUIDE.html",
-            "PushChordGrid-WP4/manifest.json",
+            "PushChordGrid-v0.5.1-RC/CHANGELOG.md",
+            "PushChordGrid-v0.5.1-RC/HARDWARE_TESTS.md",
+            "PushChordGrid-v0.5.1-RC/ORCHID_ADAPTATION.md",
+            "PushChordGrid-v0.5.1-RC/PushChordGrid-v0.5.1-RC.als",
+            "PushChordGrid-v0.5.1-RC/PushChordGrid.amxd",
+            "PushChordGrid-v0.5.1-RC/README.md",
+            "PushChordGrid-v0.5.1-RC/USAGE_GUIDE.html",
+            "PushChordGrid-v0.5.1-RC/manifest.json",
         ]
+        assert archive.read("PushChordGrid-v0.5.1-RC/PushChordGrid-v0.5.1-RC.als") == (
+            DEFAULT_LIVE_SET.read_bytes()
+        )

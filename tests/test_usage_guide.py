@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import re
 from html.parser import HTMLParser
 from pathlib import Path
-import re
 
 ROOT = Path(__file__).resolve().parents[1]
 GUIDE = ROOT / "docs/USAGE_GUIDE.html"
@@ -47,11 +47,18 @@ def test_usage_guide_is_complete_offline_and_coordinate_exact() -> None:
     assert "Shipped + roadmap" in source
     assert "Your strike shapes the whole chord" in source
     assert "Implemented · 0.4.6" in source
-    assert "v0.4.7" in source
+    assert "v0.5.1" in source
+    assert "duplicate standby" in source
     assert "Reload Grid" in source
     assert "Scale C Minor | Chord: Auto | Voice 0 | Nearest on | Bass off | Ext 9" in source
     assert "Last: Fm | Quality Min | Ext 9 | Inv VL -1" in source
-    assert "Changing Voice, Live’s scale, Base Octave, Nearest mode, or lifecycle focus clears history" in source
+    assert "PUSH SCREEN · PLAYING" in source
+    assert "Playing&nbsp;&nbsp;Cm +m7+9" in source
+    assert "Release the newest overlap and the previous held chord reappears" in source
+    assert (
+        "Changing Voice, Live’s scale, Base Octave, Nearest mode, or lifecycle focus "
+        "clears history"
+    ) in source
     assert "The page is explanatory only; it does not send MIDI." in source
 
 

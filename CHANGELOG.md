@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.5.1 — 2026-08-18
+
+- Add a device-owned **Playing** enum to Push bank slot 2, beside **Base Octave**.
+- Show the exact newest held chord root, resolved quality, and complete 6/m7/M7/9
+  extension stack; releasing an overlap reveals the previous immutable snapshot.
+- Blank the Push value after the final release and every focus, disable, reload,
+  deletion, Set-close, panic, or duplicate-lease cleanup path.
+- Keep the display inactive, non-mappable, and disconnected from the musical graph;
+  use only generated Max-native objects and the public Live parameter bank.
+- Add exhaustive enum, overlap, retrigger, held-change, lifecycle, static AMXD, bank,
+  manifest, documentation, and reproducibility checks.
+- Ship the updated v0.5.1 RC device, clean Live Set, usage guide, hardware card,
+  manifest, ZIP, and SHA-256 sidecars.
+
+## 0.5.0 — 2026-08-18
+
+- Add a Max-native, device-order-aware matrix lease so duplicate devices cannot both
+  own the Push grid or emit grid-generated music.
+- Transfer ownership in two phases: flush active notes, clear LEDs, release the native
+  matrix, clear the lease, then let the next eligible instance acquire and repaint.
+- Expire stale registrations after three seconds and reconcile through a deferred
+  named Max bus. Live testing exposed and fixed an initial nested-`Global` registry
+  incompatibility and synchronous-broadcast stack overflow.
+- Add duplicate order, stale-owner, per-instance state/velocity/LED, held scale-change,
+  and deterministic 30-minute-equivalent regressions. The suite now has 57 JavaScript
+  and 16 Python tests with 100% deterministic-core line/branch/function coverage.
+- Validate stock Drift and temporary External Instrument routes plus exact C–E♭–G
+  Session and Arrangement Post-FX recordings in Live 12.4.3.
+- Ship a clean two-track C Minor, Base Octave 2 release Set that reacquires the matrix
+  after a complete Live quit/reopen.
+- Add a deterministic v0.5.0 RC bundle, exact inventory tests, release-Set manifest
+  metadata, and SHA-256 sidecars for the AMXD and ZIP.
+- Leave only the physical 30-minute Push observation pending; Standalone remains WP6.
+
 ## 0.4.7 — 2026-08-18
 
 - Normalize LiveAPI's array-wrapped observer callbacks so root, interval, name, and

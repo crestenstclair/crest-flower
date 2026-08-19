@@ -19,8 +19,7 @@ performance area with four octave-spaced, automatically diatonic chord rows. Ver
 model while preserving those automatic rows. Strum and Arp are explicitly delegated
 to downstream Ableton MIDI devices; other timed performance transforms are not
 proposed unless that composable Live workflow exposes a concrete gap. The current
-harmonic follow-up proposals are documented in `docs/USAGE_GUIDE.html`; WP5 has not
-begun. Version 0.4.4 correlates raw physical chord-pad velocities with matrix
+harmonic follow-up proposals are documented in `docs/USAGE_GUIDE.html`. Version 0.4.4 correlates raw physical chord-pad velocities with matrix
 coordinates and records the proposed harmonic feature set as approved direction.
 Version 0.4.5 adds automatic re-enable discovery and a safe manual Reload Grid path
 for stale matrix ownership after device or hardware cycling.
@@ -29,6 +28,20 @@ last-chord/inversion/extension/emitted-pitch feedback. Advanced held-chord mutat
 Secret Chords, snapshots, and split output remain unimplemented separate changes.
 Version 0.4.7 normalizes LiveAPI's array-wrapped scale callbacks and shows the detected
 Live scale on the device face so post-load key changes are both applied and visible.
+
+WP5 implementation note (2026-08-18): v0.5.0 RC adds deterministic same-track
+duplicate arbitration, two-phase note/LED/matrix ownership transfer, stale-owner
+recovery, and multi-instance isolation. Automated stress, Live routing/recording,
+duplicate/reorder/focus/disable, cleanup, and full Live restart/reload gates pass. The
+reviewed two-track Set reopens at C Minor, Base Octave 2 with one source and one armed
+Post-FX Drift destination. Only the physical 30-minute Push performance observation
+remains pending; WP6 Standalone integration has not begun.
+
+WP5 follow-up note (2026-08-18): v0.5.1 RC adds a Push-native **Playing** display in
+the public device parameter bank. It reports the newest held immutable chord snapshot,
+including resolved quality and all 6/m7/M7/9 extensions, falls back through overlapping
+holds, and blanks after final release or lifecycle cleanup. It introduces no Remote
+Script, private Push API, runtime dependency, or musical-grid change.
 
 ## 1. Intent
 
@@ -433,6 +446,9 @@ Hardware gate:
 
 ### WP5 — Live hardening and release candidate
 
+Implemented in v0.5.0 RC on 2026-08-18. All agent-owned automated and Live-side gates
+pass; the hardware card leaves only the physical 30-minute use observation pending.
+
 Agent work:
 
 - Produce a test build, ready-to-play stock-instrument Set/track, manifest, version, and changelog.
@@ -469,6 +485,17 @@ Final hardware gate:
 - Confirm the final package has no computer, network, or unsupported runtime dependency.
 
 Gate: Standalone acceptance completes v0 and authorizes the final release bundle.
+
+### WP5 follow-up — Push playing display (implemented in 0.5.1)
+
+- Expose **Playing** beside **Base Octave** in Push's first public device parameter bank.
+- Derive it from the exact immutable snapshot used for MIDI, including resolved
+  quality and the complete 6/m7/M7/9 stack.
+- Give the newest held chord display ownership; releasing it reveals the newest
+  surviving hold, while final release and every lifecycle cleanup show `--`.
+- Generate an inactive, non-mappable enum with no outgoing musical connection.
+- Validate exact enum codes, bank position, Max attributes, wiring, dependency closure,
+  documentation, Live installation, and reproducible delivery.
 
 ### WP4 follow-up — LED renderer (implemented in 0.4.1)
 

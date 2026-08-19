@@ -5,7 +5,7 @@ The complete product contract is maintained in
 records the currently implemented slice so future work cannot accidentally cross the
 hardware gate.
 
-## Current slice: accepted WP4 plus chord-layout follow-ups
+## Current slice: WP5 v0.5.1 release candidate
 
 The proven matrix adapter and pure musical engine are now integrated. The generated
 device provides:
@@ -18,6 +18,7 @@ device provides:
 - persistent D7 Nearest mode with bass-independent deterministic inversion scoring;
 - exact last-chord identity, inversion, extension, and emitted-pitch feedback;
 - visible detected Live root/scale feedback on the current-state line;
+- a Push-native `Playing` value for the newest held exact chord snapshot;
 - exact input-velocity propagation;
 - held-pad pitch snapshots and shared-pitch reference counting;
 - exact release plus CC123 flushing for panic and every ownership-loss lifecycle;
@@ -34,13 +35,20 @@ Other timed Orchid-style transforms are not proposed unless that Live-native cha
 reveals a concrete missing capability. The current harmonic proposals are documented
 separately from implemented behavior in [`USAGE_GUIDE.html`](USAGE_GUIDE.html).
 
-## Current artifact: WP4
+WP5 additionally guarantees that duplicate device instances are arbitrated by selected
+track and visible device order. Exactly one eligible instance owns the matrix and
+generates grid music; standby copies retain isolated musical state and emit neither
+matrix LEDs nor grid triggers. Ownership transfer flushes the outgoing instance before
+the incoming instance acquires, and stale registrations expire after three seconds.
+
+## Current artifact: WP5
 
 The generated artifact is a Max for Live MIDI Effect with:
 
 - raw MIDI passthrough from `midiin` to `midiout`;
 - one stored integer parameter named **Base Octave**, defaulting to 3;
-- a Push parameter-bank entry for **Base Octave**;
+- one inactive, non-mappable enumerated **Playing** display, defaulting to `--`;
+- first-bank Push entries for **Base Octave** and **Playing**;
 - a momentary **Reload Grid** button for safe manual release, rediscovery,
   reacquisition, and repaint;
 - dynamic discovery of the active Push-family control surface by its public
@@ -80,7 +88,7 @@ WP1 and WP2 were accepted on 2026-08-17. The connected Push 3 hardware gate conf
 the four corner coordinates and lifecycle reacquisition. Push Standalone validation
 remains deferred to WP6.
 
-## WP4 exit criterion
+## WP5 exit criterion
 
 WP3 was accepted on 2026-08-17 with all specified musical behavior represented by
 exact vectors and complete deterministic-core branch coverage. WP4's automated gate
@@ -91,8 +99,17 @@ holds work great. Version 0.4.1 added LEDs; version 0.4.2 replaces the split not
 area with four automatic diatonic chord octaves. Version 0.4.3 adds Orchid-inspired
 quality, extension, inversion, and bass behavior. Version 0.4.4 corrects physical
 chord-pad velocity propagation. Version 0.4.5 adds automatic re-enable rediscovery and
-manual Reload Grid recovery. WP5 has not begun.
+manual Reload Grid recovery.
 Version 0.4.6 assigns D7 to Nearest voice leading and adds exact emitted-snapshot
-feedback. WP5 has not begun.
+feedback.
 Version 0.4.7 corrects array-wrapped Live scale observer updates and makes the detected
-scale visible. WP5 has not begun.
+scale visible.
+
+WP5 automated, dependency, duplicate-instance, routing, recording, cleanup, and Live
+restart/reload gates pass for v0.5.0 RC. Version 0.5.1 adds the exact active-chord Push
+display without changing that accepted ownership or musical behavior. The reviewed Set contains one Push Chord Grid
+source followed by MIDI Monitor and Live's Arpeggiator, plus one armed Monitor-In
+Drift destination fed from Post FX. A deterministic
+30-minute-equivalent regression produces more than 10,000 exactly matched note events.
+Only the physical 30-minute Push performance observation remains pending. WP6
+Standalone transfer and acceptance have not begun.

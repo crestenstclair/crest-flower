@@ -302,3 +302,70 @@
   `Scale <root> <name>` on the current-state line.
 - **Scope:** Version 0.4.7 WP4 correction; musical generation, active-note ownership,
   Standalone constraints, and WP5 scope are unchanged.
+
+## 2026-08-18 — WP5 duplicate-instance arbitration
+
+- **Authorization:** After the accepted WP4 follow-ups, the user explicitly directed
+  the agent to begin the next work package.
+- **Winner:** The first eligible Push Chord Grid instance in the selected track's Live
+  device order owns the matrix; device ID resolves an otherwise equal order.
+- **Lease:** A Max-native named `Global` stores only flat numeric registration and
+  lease records. A deferred named receive bus prompts reconciliation, and records
+  older than three seconds expire.
+- **Transfer:** The outgoing owner flushes exact note snapshots plus CC123, clears its
+  LED frame, releases `Button_Matrix`, and clears the lease before the incoming owner
+  may acquire and repaint. Standby copies generate no grid MIDI.
+- **Live correction:** The first build used nested objects in Max `Global` and a
+  synchronous broadcast. Live 12 exposed both assumptions: the registry could not be
+  read back reliably and recursive callbacks produced `js: stack overflow`. Flat
+  records plus a 1 ms deferred broadcast fixed the runtime without adding a dependency.
+- **Isolation evidence:** Scale, controls, nearest history, owner snapshots, velocity
+  caches, and LEDs remain instance-local. Exact duplicate/reorder/stale vectors and a
+  deterministic 30-minute-equivalent sequence leave no unmatched notes.
+
+## 2026-08-18 — WP5 Live release candidate
+
+- **Set:** `release/PushChordGrid-v0.5.0-RC Project/PushChordGrid-v0.5.0-RC.als`
+  contains exactly one **Push Chord Grid** source and one armed, Monitor-In **Chord
+  Instrument (Drift)** destination receiving **Push Chord Grid / Post FX**. Base
+  Octave is 2 and the saved Live scale is C Minor.
+- **Ownership evidence:** In Live 12.4.3, same-track duplication produced one `matrix
+  acquired` owner and one `duplicate standby` instance. Reorder, disable/re-enable,
+  track-focus changes, and C Major → A Minor changes transferred/reconciled correctly.
+- **Routing evidence:** Stock Drift and a temporary External Instrument targeting
+  **Leviasynth DR**, channel 1, were validated. Session and Arrangement recording both
+  captured the exact C3–E♭3–G3 Post-FX source notes; all probe clips, take lanes,
+  temporary devices, and temporary tracks were then removed.
+- **Restart evidence:** After a complete Live quit and relaunch, the clean Set reopened
+  with two tracks, C Minor, Base Octave 2, intact Post-FX Drift routing, and `matrix
+  acquired`. Live was left visible on the release Set.
+- **Delivery:** v0.5.0 RC includes the reviewed Set, frozen AMXD, closed manifest,
+  documentation, deterministic ZIP, and AMXD/ZIP SHA-256 sidecars. Runtime dependency
+  inventory remains empty.
+- **Gate state:** Every agent-owned automated and Live-side WP5 check passes. Only the
+  irreducible physical 30-minute Push performance observation remains pending; it is
+  not inferred. Push 3 Standalone transfer and cold-boot acceptance remain WP6 and
+  have not begun.
+
+## 2026-08-18 — Push-native active-chord display
+
+- **Authorization:** The user explicitly requested a Push-screen display of what is
+  playing after the accepted v0.5.0 RC behavior.
+- **Supported path:** The public ControlSurface LOM has no stable notification method,
+  so the display is an inactive, non-mappable `live.tab` named **Playing** in first-bank
+  slot 2 beside **Base Octave**. No Remote Script or private Push API is introduced.
+- **Identity:** Code 0 is `--`; a closed 960-value table covers every root, resolved
+  Major/Minor/Dim/Sus/Auto quality, and every 6/m7/M7/9 combination.
+- **Overlaps:** The newest held immutable chord snapshot owns the display. Its release
+  reveals the newest surviving hold; final release and every lifecycle flush blank it.
+  Last-chord feedback remains independently persistent after ordinary release.
+- **Isolation:** `Playing` has no outgoing patchline. Standby duplicate instances
+  receive no chord events, and display tracking cannot change MIDI, LEDs, harmony,
+  velocity, or shared arbitration state.
+- **Delivery:** This source-compatible follow-up is v0.5.1 RC with updated exact tests,
+  static validation, clean Set, documentation, manifest, package, and checksums.
+- **Live evidence:** The installed AMXD is byte-identical to `dist`. Live 12.4.3 loaded
+  it with Base Octave 2, C Minor, and `matrix acquired`; the saved ALS contains one
+  `MxDEnumParameter` named `Playing` with range 0–960 and default 0. A complete Live
+  quit/relaunch reopened the exact parent release Set while preserving MIDI Monitor,
+  Live's downstream Arpeggiator, the Drift route, and the selected source track.

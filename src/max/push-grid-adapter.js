@@ -1,4 +1,4 @@
-/* Push Chord Grid matrix adapter, proven in WP2 and integrated in WP4.
+/* Push Chord Grid matrix adapter, proven in WP2 and hardened in WP5.
  *
  * This file deliberately uses ES5 syntax because Max's `js` runtime is the
  * runtime target. The small pure-function export at the bottom lets Node test
@@ -16,6 +16,9 @@ var GRID_SIZE = 8;
 var DEVICE_ACTIVE_PROPERTY = "is_active";
 var FIRST_PAD_NOTE = 36;
 var LAST_CHORD_PAD_NOTE = 67;
+var ARBITRATION_BUS = "push_chord_grid_arbitration";
+var ARBITRATION_GLOBAL = "push_chord_grid_wp5";
+var ARBITRATION_STALE_MS = 3000;
 
 function coordinateFor(x, y) {
     var column = parseInt(x, 10);
@@ -122,10 +125,102 @@ function applyMatrixEvent(state, args) {
     return event;
 }
 
-function shouldOwnMatrix(deviceEnabled, ownTrackId, selectedTrackId, pushAvailable) {
+function liveDeviceOrder(deviceId, trackDeviceIds) {
+    var index = trackDeviceIds.indexOf(deviceId);
+    return index >= 0 ? index : 1000000;
+}
+
+function freshArbitrationMembers(members, now, staleMs) {
+    var fresh = {};
+    var maximumAge = staleMs === undefined ? ARBITRATION_STALE_MS : staleMs;
+    Object.keys(members || {}).forEach(function (key) {
+        var member = members[key];
+        if (
+            member &&
+            now - member.lastSeen <= maximumAge &&
+            now >= member.lastSeen
+        ) {
+            fresh[key] = member;
+        }
+    });
+    return fresh;
+}
+
+function arbitrationWinner(members, selectedTrackId, now, staleMs) {
+    var candidates = [];
+    var fresh = freshArbitrationMembers(members, now, staleMs);
+    Object.keys(fresh).forEach(function (key) {
+        var member = fresh[key];
+        if (
+            member.enabled &&
+            member.available &&
+            member.trackId > 0 &&
+            member.trackId === selectedTrackId
+        ) {
+            candidates.push(member);
+        }
+    });
+    candidates.sort(function (left, right) {
+        if (left.order !== right.order) {
+            return left.order - right.order;
+        }
+        return left.deviceId - right.deviceId;
+    });
+    return candidates.length ? candidates[0].deviceId : 0;
+}
+
+function membersFromArbitrationRegistry(flat) {
+    var members = {};
+    var index;
+    if (!flat || flat.length === undefined) {
+        return members;
+    }
+    for (index = 0; index + 5 < flat.length; index += 6) {
+        var member = {
+            deviceId: numericId(flat[index]),
+            trackId: numericId(flat[index + 1]),
+            order: integerFrom(flat[index + 2], 1000000),
+            enabled: integerFrom(flat[index + 3], 0) !== 0,
+            available: integerFrom(flat[index + 4], 0) !== 0,
+            lastSeen: parseInt(flat[index + 5], 10)
+        };
+        if (member.deviceId > 0 && !isNaN(member.lastSeen)) {
+            members[String(member.deviceId)] = member;
+        }
+    }
+    return members;
+}
+
+function arbitrationRegistryValues(members) {
+    var flat = [];
+    Object.keys(members || {}).sort(function (left, right) {
+        return numericId(left) - numericId(right);
+    }).forEach(function (key) {
+        var member = members[key];
+        flat.push(
+            member.deviceId,
+            member.trackId,
+            member.order,
+            member.enabled ? 1 : 0,
+            member.available ? 1 : 0,
+            member.lastSeen
+        );
+    });
+    return flat;
+}
+
+function shouldOwnMatrix(
+    deviceEnabled,
+    ownTrackId,
+    selectedTrackId,
+    pushAvailable,
+    instanceEligible
+) {
+    var eligible = instanceEligible === undefined ? true : Boolean(instanceEligible);
     return Boolean(
         deviceEnabled &&
         pushAvailable &&
+        eligible &&
         ownTrackId > 0 &&
         ownTrackId === selectedTrackId
     );
@@ -140,16 +235,21 @@ var deviceEnabledFlag = false;
 var shuttingDown = false;
 var acquired = false;
 var ownershipRequested = false;
+var deviceId = 0;
 var ownTrackId = 0;
 var selectedTrackId = 0;
 var pushId = 0;
 var matrixId = 0;
 var deviceApi = null;
+var ownTrackApi = null;
 var selectedTrackApi = null;
 var watchdogTask = null;
 var rendererTask = null;
+var arbitrationBroadcastTask = null;
 var gridState = createGridState();
 var padVelocityCache = createPadVelocityCache();
+var arbitrationState =
+    runtimeAvailable && typeof Global !== "undefined" ? new Global(ARBITRATION_GLOBAL) : null;
 
 function numericId(value) {
     var parsed = parseInt(value, 10);
@@ -192,6 +292,138 @@ function integerFrom(value, fallback) {
         }
     }
     return fallback;
+}
+
+function arbitrationNow() {
+    return new Date().getTime();
+}
+
+function arbitrationMembers() {
+    if (!arbitrationState) {
+        return {};
+    }
+    if (isNaN(parseInt(arbitrationState.leaseDeviceId, 10))) {
+        arbitrationState.leaseDeviceId = 0;
+    }
+    return membersFromArbitrationRegistry(arbitrationState.registry);
+}
+
+function writeArbitrationMembers(members) {
+    if (!arbitrationState) {
+        return;
+    }
+    arbitrationState.registry = arbitrationRegistryValues(members);
+}
+
+function pruneArbitrationState(now) {
+    if (!arbitrationState) {
+        return false;
+    }
+    var members = arbitrationMembers();
+    var fresh = freshArbitrationMembers(members, now, ARBITRATION_STALE_MS);
+    var changed = Object.keys(fresh).length !== Object.keys(members).length;
+    writeArbitrationMembers(fresh);
+    var lease = numericId(arbitrationState.leaseDeviceId);
+    if (lease !== 0 && !fresh[String(lease)]) {
+        arbitrationState.leaseDeviceId = 0;
+        changed = true;
+    }
+    return changed;
+}
+
+function trackDeviceIds() {
+    if (!ownTrackApi) {
+        return [];
+    }
+    try {
+        return idsFrom(ownTrackApi.get("devices"));
+    } catch (error) {
+        return [];
+    }
+}
+
+function updateArbitrationRegistration(now) {
+    if (!arbitrationState || deviceId <= 0 || ownTrackId <= 0) {
+        return false;
+    }
+    var members = arbitrationMembers();
+    var key = String(deviceId);
+    var previous = members[key];
+    var next = {
+        deviceId: deviceId,
+        trackId: ownTrackId,
+        order: liveDeviceOrder(deviceId, trackDeviceIds()),
+        enabled: deviceEnabledFlag,
+        available: pushId !== 0 && matrixId !== 0,
+        lastSeen: now
+    };
+    var changed = !previous ||
+        previous.trackId !== next.trackId ||
+        previous.order !== next.order ||
+        previous.enabled !== next.enabled ||
+        previous.available !== next.available;
+    members[key] = next;
+    writeArbitrationMembers(members);
+    return changed;
+}
+
+function removeArbitrationRegistration() {
+    if (!arbitrationState || deviceId <= 0) {
+        return false;
+    }
+    var members = arbitrationMembers();
+    var key = String(deviceId);
+    var changed = Boolean(members[key]);
+    if (members[key]) {
+        delete members[key];
+        writeArbitrationMembers(members);
+    }
+    if (numericId(arbitrationState.leaseDeviceId) === deviceId) {
+        arbitrationState.leaseDeviceId = 0;
+        changed = true;
+    }
+    return changed;
+}
+
+function arbitrationLeaseOwner() {
+    return arbitrationState ? numericId(arbitrationState.leaseDeviceId) : deviceId;
+}
+
+function claimArbitrationLease(winnerId) {
+    if (!arbitrationState) {
+        return winnerId === deviceId;
+    }
+    var lease = arbitrationLeaseOwner();
+    if (winnerId !== deviceId || (lease !== 0 && lease !== deviceId)) {
+        return false;
+    }
+    arbitrationState.leaseDeviceId = deviceId;
+    return true;
+}
+
+function releaseArbitrationLease() {
+    if (!arbitrationState || arbitrationLeaseOwner() !== deviceId) {
+        return false;
+    }
+    arbitrationState.leaseDeviceId = 0;
+    return true;
+}
+
+function broadcastArbitration() {
+    if (
+        !runtimeAvailable ||
+        typeof messnamed === "undefined" ||
+        arbitrationBroadcastTask
+    ) {
+        return;
+    }
+    arbitrationBroadcastTask = new Task(function () {
+        arbitrationBroadcastTask = null;
+        if (!shuttingDown) {
+            messnamed(ARBITRATION_BUS, "arbitrate");
+        }
+    }, this);
+    arbitrationBroadcastTask.schedule(1);
 }
 
 function emitPad(event) {
@@ -247,36 +479,69 @@ function scheduleRenderer() {
     rendererTask.schedule(50);
 }
 
+function resetOwnedInputState() {
+    gridState = createGridState();
+    padVelocityCache = createPadVelocityCache();
+}
+
+function releaseCurrentOwnership(lifecycle) {
+    if (acquired) {
+        emitLifecycle(lifecycle);
+        cancelRendererTask();
+        outlet(3, "grid_ownership", 0);
+    }
+    setNativeOwnership(0);
+    acquired = false;
+    resetOwnedInputState();
+    return releaseArbitrationLease();
+}
+
 function reconcileOwnership() {
     if (!initializedFlag || shuttingDown) {
-        return;
+        return false;
     }
+    var now = arbitrationNow();
+    var changed = pruneArbitrationState(now);
+    changed = updateArbitrationRegistration(now) || changed;
+    var winnerId = arbitrationState ?
+        arbitrationWinner(arbitrationMembers(), selectedTrackId, now, ARBITRATION_STALE_MS) :
+        deviceId;
+    var instanceEligible = !arbitrationState || winnerId === deviceId;
     var desired = shouldOwnMatrix(
         deviceEnabledFlag,
         ownTrackId,
         selectedTrackId,
-        pushId !== 0 && matrixId !== 0
+        pushId !== 0 && matrixId !== 0,
+        instanceEligible
     );
     if (!desired) {
-        if (acquired) {
-            emitLifecycle(deviceEnabledFlag ? "focus_lost" : "disabled");
-            cancelRendererTask();
-            outlet(3, "grid_ownership", 0);
-        }
-        setNativeOwnership(0);
-        acquired = false;
-        gridState = createGridState();
-        padVelocityCache = createPadVelocityCache();
+        var released = releaseCurrentOwnership(
+            deviceEnabledFlag ? "focus_lost" : "disabled"
+        );
         if (!deviceEnabledFlag) {
             emitStatus("device disabled");
         } else if (ownTrackId !== selectedTrackId) {
             emitStatus("inactive track");
         } else if (pushId === 0) {
             emitStatus("no Push");
-        } else {
+        } else if (matrixId === 0) {
             emitStatus("no matrix");
+        } else if (winnerId !== 0 && winnerId !== deviceId) {
+            emitStatus("duplicate standby");
+        } else {
+            emitStatus("ownership standby");
         }
-        return;
+        if (released) {
+            broadcastArbitration();
+        }
+        return changed || released;
+    }
+    if (!claimArbitrationLease(winnerId)) {
+        if (acquired) {
+            releaseCurrentOwnership("focus_lost");
+        }
+        emitStatus("waiting for matrix owner");
+        return changed;
     }
     if (!acquired) {
         setNativeOwnership(1);
@@ -284,22 +549,21 @@ function reconcileOwnership() {
         emitStatus("matrix acquired");
         scheduleRenderer();
     }
+    return changed;
 }
 
 function push_surface() {
     var values = Array.prototype.slice.call(arguments);
     pushId = controlIdFrom(values);
     reconcileOwnership();
+    broadcastArbitration();
 }
 
 function matrix_id() {
     var values = Array.prototype.slice.call(arguments);
     matrixId = controlIdFrom(values);
-    if (matrixId === 0) {
-        setNativeOwnership(0);
-        acquired = false;
-    }
     reconcileOwnership();
+    broadcastArbitration();
 }
 
 function matrix_event() {
@@ -321,7 +585,7 @@ function pad_velocity(note, velocity) {
     cachePadVelocity(padVelocityCache, note, velocity);
 }
 
-function selectedTrackChanged(args) {
+function refreshSelectedTrack(args) {
     var ids = idsFrom(args);
     if (ids.length) {
         selectedTrackId = ids[ids.length - 1];
@@ -333,7 +597,12 @@ function selectedTrackChanged(args) {
             selectedTrackId = 0;
         }
     }
+}
+
+function selectedTrackChanged(args) {
+    refreshSelectedTrack(args);
     reconcileOwnership();
+    broadcastArbitration();
 }
 
 function deviceActiveChanged(args) {
@@ -347,6 +616,14 @@ function deviceActiveChanged(args) {
     }
     deviceEnabledFlag = active !== 0;
     reconcileOwnership();
+    broadcastArbitration();
+}
+
+function arbitrate() {
+    if (!initializedFlag || shuttingDown) {
+        return;
+    }
+    reconcileOwnership();
 }
 
 function watchdog() {
@@ -354,7 +631,9 @@ function watchdog() {
     if (shuttingDown || !initializedFlag) {
         return;
     }
-    selectedTrackChanged(null);
+    refreshSelectedTrack(null);
+    reconcileOwnership();
+    broadcastArbitration();
     watchdogTask = new Task(watchdog, this);
     watchdogTask.schedule(1000);
 }
@@ -367,13 +646,16 @@ function initialized() {
     emitStatus("initializing");
     try {
         deviceApi = new LiveAPI(deviceActiveChanged, "this_device");
+        deviceId = controlIdFrom(deviceApi.id);
         deviceEnabledFlag = integerFrom(deviceApi.get(DEVICE_ACTIVE_PROPERTY), 0) !== 0;
         deviceApi.property = DEVICE_ACTIVE_PROPERTY;
-        var ownTrackApi = new LiveAPI(null, "this_device canonical_parent");
+        ownTrackApi = new LiveAPI(null, "this_device canonical_parent");
         ownTrackId = controlIdFrom(ownTrackApi.id);
         selectedTrackApi = new LiveAPI(selectedTrackChanged, "live_set view");
         selectedTrackApi.property = "selected_track";
-        selectedTrackChanged(null);
+        refreshSelectedTrack(null);
+        reconcileOwnership();
+        broadcastArbitration();
         watchdog();
     } catch (error) {
         initializedFlag = false;
@@ -390,17 +672,11 @@ function reload() {
         return;
     }
     emitStatus("reloading grid");
-    if (acquired) {
-        emitLifecycle("reload");
-        cancelRendererTask();
-        outlet(3, "grid_ownership", 0);
-    }
-    setNativeOwnership(0);
-    acquired = false;
+    releaseCurrentOwnership("reload");
     pushId = 0;
     matrixId = 0;
-    gridState = createGridState();
-    padVelocityCache = createPadVelocityCache();
+    updateArbitrationRegistration(arbitrationNow());
+    broadcastArbitration();
 }
 
 function shutdown() {
@@ -416,17 +692,18 @@ function shutdown() {
         }
     }
     watchdogTask = null;
+    if (arbitrationBroadcastTask) {
+        try {
+            arbitrationBroadcastTask.cancel();
+        } catch (broadcastError) {
+            // The deferred broadcast may already be completing during teardown.
+        }
+    }
+    arbitrationBroadcastTask = null;
     cancelRendererTask();
-    if (acquired) {
-        emitLifecycle("deleted");
-        outlet(3, "grid_ownership", 0);
-    }
-    if (runtimeAvailable && ownershipRequested) {
-        outlet(2, 0);
-    }
-    ownershipRequested = false;
-    acquired = false;
-    padVelocityCache = createPadVelocityCache();
+    releaseCurrentOwnership("deleted");
+    removeArbitrationRegistration();
+    broadcastArbitration();
     if (deviceApi) {
         try {
             deviceApi.property = "";
@@ -442,6 +719,7 @@ function shutdown() {
         }
     }
     selectedTrackApi = null;
+    ownTrackApi = null;
     deviceApi = null;
 }
 
@@ -451,18 +729,25 @@ function notifydeleted() {
 
 if (typeof module !== "undefined" && module.exports) {
     module.exports = {
+        ARBITRATION_BUS: ARBITRATION_BUS,
+        ARBITRATION_STALE_MS: ARBITRATION_STALE_MS,
         DEVICE_ACTIVE_PROPERTY: DEVICE_ACTIVE_PROPERTY,
         FIRST_PAD_NOTE: FIRST_PAD_NOTE,
         GRID_SIZE: GRID_SIZE,
         LAST_CHORD_PAD_NOTE: LAST_CHORD_PAD_NOTE,
         applyCachedPadVelocity: applyCachedPadVelocity,
         applyMatrixEvent: applyMatrixEvent,
+        arbitrationRegistryValues: arbitrationRegistryValues,
+        arbitrationWinner: arbitrationWinner,
         cachePadVelocity: cachePadVelocity,
         controlIdFrom: controlIdFrom,
         coordinateFor: coordinateFor,
         coordinateForPadNote: coordinateForPadNote,
         createGridState: createGridState,
         createPadVelocityCache: createPadVelocityCache,
+        freshArbitrationMembers: freshArbitrationMembers,
+        liveDeviceOrder: liveDeviceOrder,
+        membersFromArbitrationRegistry: membersFromArbitrationRegistry,
         normalizeMatrixEvent: normalizeMatrixEvent,
         shouldOwnMatrix: shouldOwnMatrix
     };

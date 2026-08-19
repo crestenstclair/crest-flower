@@ -1,8 +1,8 @@
 {
   "artifact": {
-    "bytes": 94903,
+    "bytes": 130116,
     "path": "PushChordGrid.amxd",
-    "sha256": "fc261d64489d2c2127cbcf5fa50da42048cf27361027691ea493e1aacc66f467",
+    "sha256": "8124dde2a8721a6eba74d0c01df5099894851b9b1f644addc2b066b20c407f96",
     "type_code": "mmmm"
   },
   "embedded_runtime_files": [
@@ -19,11 +19,17 @@
     "version": "0.8.0"
   },
   "project": "push-chord-grid",
+  "release_set": {
+    "bytes": 23864,
+    "path": "PushChordGrid-v0.5.1-RC.als",
+    "sha256": "bf4089e5dff7dbfe3cc019d16950fc722612e05ceb1ab8f40e23adbb307b25ae"
+  },
   "runtime_dependencies": [],
   "schema_version": 1,
-  "stage": "WP4",
+  "stage": "WP5",
   "stored_parameters": [
-    "Base Octave"
+    "Base Octave",
+    "Playing"
   ],
-  "version": "0.4.7"
+  "version": "0.5.1"
 }

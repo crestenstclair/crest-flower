@@ -89,6 +89,7 @@ Push matrix ───────────────┐
 raw pad velocity (36–67) ──┴▶ grid adapter ─▶ coordinate router ─▶ WP3 musical engine
                               │              │                 ├▶ nearest-history scorer
                               │              │                 ├▶ exact chord feedback
+                              │              │                 ├▶ active snapshot stack ─▶ Playing
                               │              │                 │
                               │              └───────────────▶ active-note flush
                               └──────────────────────────────▶ LED state/diff cache
@@ -128,6 +129,54 @@ performs the same flush before rediscovery. Max's deletion notification performs
 same flush for device deletion and Set teardown.
 
 All six JavaScript runtime files are embedded in the reproducibly frozen AMXD.
+
+### Push playing display
+
+`runtime-adapter.js` keeps a coordinate-keyed map of the same immutable snapshots
+used for musical presses plus a newest-held order. Its sixth outlet emits a
+deterministic code whenever a chord is pressed, retriggered, released, or flushed.
+Code 0 is `--`; codes 1–960 cover 12 roots, five resolved qualities, and all 16
+6/m7/M7/9 masks. Releasing the newest overlap exposes the previous stored snapshot,
+so current controls or scale changes cannot relabel a chord that is still sounding.
+
+The generated graph sends the code through `prepend set` to an inactive,
+non-mappable `live.tab` named **Playing**. The first Push bank is exactly **Base
+Octave**, **Playing**, then six empty slots. This uses Live's public device-parameter
+bank rather than a private control-surface notification or Remote Script. The
+`live.tab` has no outgoing patchline and cannot affect MIDI, LEDs, ownership, or
+harmony state. Lifecycle cleanup clears the active display map and emits `--` along
+with the existing note/LED release.
+
+## WP5 Live hardening
+
+Each `push-grid-adapter.js` instance registers a flat numeric member record in the
+named Max `Global("push_chord_grid_wp5")`. Flat records are deliberate: Live's Max
+runtime did not preserve the first nested-object registry implementation. A named
+`receive push_chord_grid_arbitration` object connects a deferred reconciliation bus to
+every generated instance; deferral avoids the synchronous recursive broadcast that
+Live exposed as a Max JavaScript stack overflow.
+
+Members publish Live device ID, parent track ID, visible device-order index,
+enablement, Push/matrix availability, and heartbeat. On the selected track, the first
+eligible registered device in chain order wins, with device ID as a stable tie-break.
+Registrations and leases older than three seconds are discarded. The shared state
+contains only arbitration metadata: scale state, modifiers, nearest history, active
+note owners, velocity correlation, and LED diff caches remain per instance.
+
+Transfer is two-phase. If the winner changes, the old owner first executes the normal
+lifecycle flush, sends zero to its owned LEDs, releases the native `Button_Matrix`,
+and clears the global lease. Only then can the new winner claim the lease, grab the
+matrix, and repaint one complete frame. Standby instances show `duplicate standby`,
+receive no gated matrix events, and emit no grid-generated MIDI or LED commands.
+
+The reviewed WP5 Set is a binary release input at
+`release/PushChordGrid-v0.5.1-RC Project/PushChordGrid-v0.5.1-RC.als`. It contains one
+source chain—Push Chord Grid, MIDI Monitor, then Live's Arpeggiator—and one armed,
+Monitor-In Drift destination fed from the source's Post FX MIDI. The manifest hashes
+both AMXD and Set. Deterministic packaging copies their
+exact bytes with fixed ZIP metadata, enforces a closed inventory, and writes AMXD/ZIP
+SHA-256 sidecars. Producer Pal, network access, and desktop helpers are neither runtime
+dependencies nor release-Set contents.
 Runtime dependencies remain limited to native Max, Max `js`, and the public Live Object
 Model.
 
@@ -164,7 +213,9 @@ changes and lifecycle flushes clear history; ordinary release does not.
 type/extensions, persistent chord/Nearest/bass voicing, and the prior chord-tone
 snapshot. The generated snapshot also carries root, resolved quality, extensions,
 inversion adjustment, chord tones, and final pitches to the dedicated feedback line.
-A held pad's pitch array is copied
+`runtime-adapter.js` separately indexes those immutable snapshots while they are held
+for the Push **Playing** display; ordinary release removes only active display state
+and leaves last-chord feedback intact. A held pad's pitch array is copied
 into `active-notes.js`; later state changes therefore cannot change its release. Each
 pitch is emitted on the first
 owner transition from zero to one and released on the last transition from one to zero.

@@ -44,7 +44,7 @@ def test_forbidden_object_is_rejected(tmp_path: Path) -> None:
 
     errors = validate_document(document)
     assert "forbidden runtime object: node.script" in errors
-    assert "undeclared WP4 newobj: node.script" in errors
+    assert "undeclared WP5 newobj: node.script" in errors
 
 
 def test_declared_external_dependency_is_rejected(tmp_path: Path) -> None:
@@ -53,7 +53,7 @@ def test_declared_external_dependency_is_rejected(tmp_path: Path) -> None:
 
     errors = validate_document(document)
     assert any(
-        error.startswith("WP4 dependency cache does not exactly declare") for error in errors
+        error.startswith("WP5 dependency cache does not exactly declare") for error in errors
     )
     assert "unembedded runtime dependencies: ['external.mxo']" in errors
 

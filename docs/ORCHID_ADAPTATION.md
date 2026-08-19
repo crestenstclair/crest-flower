@@ -1,7 +1,7 @@
 # Orchid capability study and Push adaptation
 
 Research date: 2026-08-17  
-Implemented slice: Push Chord Grid v0.4.7
+Implemented slice: Push Chord Grid v0.5.0 RC
 
 ## Source record
 
@@ -97,6 +97,11 @@ Version 0.4.7 corrects post-load Live scale observation by normalizing LiveAPI's
 single-array callback shape. The current-state line now names the detected Live scale,
 so automatic Key Mode changes are visible before the next chord press.
 
+Version 0.5.0 hardens that surface for normal Live project use. Same-track duplicate
+devices now resolve to one device-order owner; standby copies emit no matrix lighting
+or grid-generated music, and every ownership transfer flushes notes and LEDs before
+reacquisition. This changes project reliability, not Orchid-derived musical behavior.
+
 ## Remaining proposed follow-ups
 
 The user approved this remaining proposal set as product direction. It is intentionally
@@ -114,7 +119,7 @@ Possible pad placements are design notes, not assigned coordinate roles. Reserve
 remain silent until a proposal is accepted, implemented, documented, and covered by
 the full automated and hardware gates.
 
-## Exact v0.4.7 grid
+## Exact v0.5.0 grid
 
 Push coordinates use chess notation: A1 is bottom-left and H8 is top-right.
 

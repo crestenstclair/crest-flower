@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate a WP4 artifact and its deterministic manifest."""
+"""Validate the WP5 artifact, release Set, and deterministic manifest."""
 
 from __future__ import annotations
 
@@ -15,11 +15,18 @@ try:
 except ImportError:  # Direct script execution.
     from inspect_amxd import AmxdValidationError, summary, validate_amxd
 
-PROJECT_VERSION = "0.4.7"
-BUILD_STAGE = "WP4"
+PROJECT_VERSION = "0.5.1"
+BUILD_STAGE = "WP5"
 GENERATOR_NAME = "m4l-builder"
 GENERATOR_VERSION = "0.8.0"
 GENERATOR_COMMIT = "6c602b2861bf628d14fd39854d984b12de3cebff"
+ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_LIVE_SET = (
+    ROOT
+    / "release"
+    / "PushChordGrid-v0.5.1-RC Project"
+    / "PushChordGrid-v0.5.1-RC.als"
+)
 
 
 def sha256(path: Path) -> str:
@@ -30,7 +37,10 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def expected_manifest(artifact: Path) -> dict[str, Any]:
+def expected_manifest(
+    artifact: Path,
+    live_set: Path = DEFAULT_LIVE_SET,
+) -> dict[str, Any]:
     document = validate_amxd(artifact)
     inspection = summary(document)
     return {
@@ -43,6 +53,11 @@ def expected_manifest(artifact: Path) -> dict[str, Any]:
             "bytes": artifact.stat().st_size,
             "sha256": sha256(artifact),
             "type_code": inspection["type_code"],
+        },
+        "release_set": {
+            "path": live_set.name,
+            "bytes": live_set.stat().st_size,
+            "sha256": sha256(live_set),
         },
         "generator": {
             "name": GENERATOR_NAME,
@@ -63,9 +78,10 @@ def validate_release(
     artifact: Path,
     manifest_path: Path,
     *,
+    live_set: Path = DEFAULT_LIVE_SET,
     write_manifest: bool = False,
 ) -> dict[str, Any]:
-    expected = expected_manifest(artifact)
+    expected = expected_manifest(artifact, live_set)
     if write_manifest:
         manifest_path.parent.mkdir(parents=True, exist_ok=True)
         manifest_path.write_bytes(manifest_bytes(expected))
@@ -86,12 +102,14 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("artifact", type=Path)
     parser.add_argument("--manifest", type=Path, default=Path("dist/manifest.json"))
+    parser.add_argument("--live-set", type=Path, default=DEFAULT_LIVE_SET)
     parser.add_argument("--write-manifest", action="store_true")
     args = parser.parse_args()
     try:
         manifest = validate_release(
             args.artifact,
             args.manifest,
+            live_set=args.live_set,
             write_manifest=args.write_manifest,
         )
     except (OSError, AmxdValidationError) as exc:

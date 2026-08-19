@@ -135,10 +135,121 @@ test("velocity correlation preserves releases, mismatches, and matrix fallback",
     assert.equal(adapter.cachePadVelocity(cache, 36, 128), null);
 });
 
+test("physical velocity caches remain isolated between device instances", () => {
+    const first = adapter.createPadVelocityCache();
+    const second = adapter.createPadVelocityCache();
+    adapter.cachePadVelocity(first, 36, 17);
+    adapter.cachePadVelocity(second, 36, 119);
+
+    assert.equal(
+        adapter.applyCachedPadVelocity(first, adapter.normalizeMatrixEvent([127, 0, 7])).velocity,
+        17
+    );
+    assert.equal(
+        adapter.applyCachedPadVelocity(second, adapter.normalizeMatrixEvent([127, 0, 7])).velocity,
+        119
+    );
+    assert.equal(Object.keys(first).length, 0);
+    assert.equal(Object.keys(second).length, 0);
+});
+
 test("ownership requires enablement, Push availability, and selected own track", () => {
     assert.equal(adapter.shouldOwnMatrix(true, 42, 42, true), true);
+    assert.equal(adapter.shouldOwnMatrix(true, 42, 42, true, true), true);
     assert.equal(adapter.shouldOwnMatrix(false, 42, 42, true), false);
     assert.equal(adapter.shouldOwnMatrix(true, 42, 41, true), false);
     assert.equal(adapter.shouldOwnMatrix(true, 42, 42, false), false);
+    assert.equal(adapter.shouldOwnMatrix(true, 42, 42, true, false), false);
     assert.equal(adapter.shouldOwnMatrix(true, 0, 0, true), false);
+});
+
+test("duplicate arbitration follows device order with a stable id tie-break", () => {
+    const now = 10000;
+    const members = {
+        300: {
+            deviceId: 300, trackId: 42, order: 2,
+            enabled: true, available: true, lastSeen: now
+        },
+        200: {
+            deviceId: 200, trackId: 42, order: 0,
+            enabled: true, available: true, lastSeen: now
+        },
+        100: {
+            deviceId: 100, trackId: 42, order: 0,
+            enabled: true, available: true, lastSeen: now
+        }
+    };
+
+    assert.equal(adapter.arbitrationWinner(members, 42, now), 100);
+    members[100].order = 3;
+    assert.equal(adapter.arbitrationWinner(members, 42, now), 200);
+    assert.equal(adapter.arbitrationWinner(members, 41, now), 0);
+    assert.equal(adapter.liveDeviceOrder(200, [9, 200, 300]), 1);
+    assert.equal(adapter.liveDeviceOrder(777, [9, 200, 300]), 1000000);
+});
+
+test("Max-safe flat arbitration registry round-trips exact member state", () => {
+    const members = {
+        300: {
+            deviceId: 300, trackId: 42, order: 2,
+            enabled: false, available: true, lastSeen: 123456789
+        },
+        100: {
+            deviceId: 100, trackId: 41, order: 0,
+            enabled: true, available: false, lastSeen: 123456700
+        }
+    };
+    const flat = adapter.arbitrationRegistryValues(members);
+    assert.deepEqual(flat, [
+        100, 41, 0, 1, 0, 123456700,
+        300, 42, 2, 0, 1, 123456789
+    ]);
+    assert.deepEqual(adapter.membersFromArbitrationRegistry(flat), {
+        100: members[100],
+        300: members[300]
+    });
+    assert.deepEqual(adapter.membersFromArbitrationRegistry(null), {});
+    assert.deepEqual(
+        adapter.membersFromArbitrationRegistry(["bad", 42, 0, 1, 1, 100]),
+        {}
+    );
+});
+
+test("arbitration excludes inactive, unavailable, other-track, and stale members", () => {
+    const now = 20000;
+    const members = {
+        10: {
+            deviceId: 10, trackId: 7, order: 0,
+            enabled: false, available: true, lastSeen: now
+        },
+        11: {
+            deviceId: 11, trackId: 7, order: 1,
+            enabled: true, available: false, lastSeen: now
+        },
+        12: {
+            deviceId: 12, trackId: 8, order: 0,
+            enabled: true, available: true, lastSeen: now
+        },
+        13: {
+            deviceId: 13, trackId: 7, order: 2,
+            enabled: true, available: true,
+            lastSeen: now - adapter.ARBITRATION_STALE_MS - 1
+        },
+        14: {
+            deviceId: 14, trackId: 7, order: 3,
+            enabled: true, available: true, lastSeen: now
+        }
+    };
+
+    assert.deepEqual(
+        Object.keys(adapter.freshArbitrationMembers(
+            members,
+            now,
+            adapter.ARBITRATION_STALE_MS
+        )),
+        ["10", "11", "12", "14"]
+    );
+    assert.equal(adapter.arbitrationWinner(members, 7, now), 14);
+    assert.equal(adapter.arbitrationWinner(members, 8, now), 12);
+    assert.equal(adapter.ARBITRATION_BUS, "push_chord_grid_arbitration");
 });

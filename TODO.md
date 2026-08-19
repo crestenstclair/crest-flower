@@ -1,0 +1,1 @@
+- Add functionality that it will select correct 7th, 4th, etc... instead of making you choose major/minor

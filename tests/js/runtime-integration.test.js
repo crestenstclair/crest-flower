@@ -275,6 +275,80 @@ test("feedback identifies extensions, bass, manual quality, and nearest inversio
     );
 });
 
+test("Push Playing enum has exact deterministic chord labels and codes", () => {
+    const labels = integration.playingDisplayLabels();
+    assert.equal(labels.length, 961);
+    assert.equal(new Set(labels).size, 961);
+    assert.equal(labels[0], "--");
+    assert.equal(labels[1], "C");
+    assert.equal(labels[27], "Cm +m7+9");
+    assert.equal(labels[960], "Bauto +6+m7+M7+9");
+    assert.equal(
+        integration.playingDisplayCodeForSnapshot({
+            rootPitch: 60,
+            resolvedQuality: "minor",
+            extensions: ["minor_seventh", "ninth"]
+        }),
+        27
+    );
+    assert.equal(
+        integration.playingDisplayLabelForSnapshot({
+            rootPitch: 60,
+            resolvedQuality: "minor",
+            extensions: ["minor_seventh", "ninth"]
+        }),
+        "Cm +m7+9"
+    );
+    assert.equal(integration.playingDisplayCodeForSnapshot(null), 0);
+    assert.equal(integration.playingDisplayLabelForSnapshot(null), "--");
+});
+
+test("Push Playing follows newest immutable overlapping hold and retrigger", () => {
+    const runtime = integration.createRuntime({
+        rootNote: 0,
+        scaleIntervals: [0, 2, 3, 5, 7, 8, 10]
+    });
+    assert.equal(integration.playingDisplayCode(runtime), 0);
+    assert.equal(integration.playingDisplayLabel(runtime), "--");
+
+    integration.processGridEvent(runtime, "A1", 88);
+    assert.equal(integration.playingDisplayLabel(runtime), "Cm");
+    integration.processGridEvent(runtime, "C1", 73);
+    assert.equal(integration.playingDisplayLabel(runtime), "D#");
+
+    integration.applyScaleSnapshot(runtime, 9, [0, 2, 3, 5, 7, 8, 10]);
+    integration.processGridEvent(runtime, "H8", 100);
+    assert.equal(integration.playingDisplayLabel(runtime), "D#");
+
+    integration.processGridEvent(runtime, "C1", 0);
+    assert.equal(integration.playingDisplayLabel(runtime), "Cm");
+    integration.processGridEvent(runtime, "A1", 99);
+    assert.equal(integration.playingDisplayLabel(runtime), "Am +9");
+    assert.equal(runtime.activeChordOrder.length, 1);
+
+    integration.processGridEvent(runtime, "A1", 0);
+    assert.equal(integration.playingDisplayCode(runtime), 0);
+    assert.equal(integration.playingDisplayLabel(runtime), "--");
+});
+
+test("Push Playing ignores controls and clears on every lifecycle", () => {
+    const lifecycles = ["panic", "focus_lost", "disabled", "reload", "deleted", "set_closed"];
+    lifecycles.forEach((lifecycle) => {
+        const runtime = integration.createRuntime();
+        integration.processGridEvent(runtime, "B8", 100);
+        integration.processGridEvent(runtime, "F8", 100);
+        integration.processGridEvent(runtime, "H8", 100);
+        assert.equal(integration.playingDisplayLabel(runtime), "--");
+        integration.processGridEvent(runtime, "A1", 64);
+        assert.equal(integration.playingDisplayLabel(runtime), "Cm +m7+9");
+        integration.processLifecycle(runtime, lifecycle);
+        assert.equal(integration.playingDisplayCode(runtime), 0);
+        assert.equal(integration.playingDisplayLabel(runtime), "--");
+        assert.deepEqual(runtime.activeChordSnapshots, Object.create(null));
+        assert.deepEqual(runtime.activeChordOrder, []);
+    });
+});
+
 test("overlapping holds reference-count shared voices and lifecycle flushes", () => {
     const runtime = integration.createRuntime();
     assert.deepEqual(integration.processGridEvent(runtime, "A1", 100), [
@@ -287,6 +361,118 @@ test("overlapping holds reference-count shared voices and lifecycle flushes", ()
         {type: "control_change", controller: 123, value: 0}
     ]);
     assert.deepEqual(integration.processGridEvent(runtime, "A1", 0), []);
+});
+
+test("duplicate runtimes isolate scale, history, owners, controls, and LEDs", () => {
+    const first = integration.createRuntime();
+    const second = integration.createRuntime({
+        rootNote: 9,
+        scaleIntervals: [0, 2, 3, 5, 7, 8, 10]
+    });
+    integration.setLedOwnership(first, true);
+    integration.setLedOwnership(second, true);
+    integration.processGridEvent(first, "D7", 100);
+    integration.processGridEvent(first, "D7", 0);
+    integration.processGridEvent(second, "B8", 100);
+    integration.processGridEvent(second, "H8", 100);
+
+    assert.deepEqual(integration.processGridEvent(first, "A1", 31), [
+        noteOn(60, 31), noteOn(64, 31), noteOn(67, 31)
+    ]);
+    assert.deepEqual(integration.processGridEvent(second, "A1", 117), [
+        noteOn(69, 117), noteOn(72, 117), noteOn(76, 117), noteOn(83, 117)
+    ]);
+    assert.equal(first.musical.voiceLeadingEnabled, true);
+    assert.equal(second.musical.voiceLeadingEnabled, false);
+    assert.equal(first.musical.chordType, "auto");
+    assert.equal(second.musical.chordType, "minor");
+    assert.deepEqual(first.notes.owners.$A1, [60, 64, 67]);
+    assert.deepEqual(second.notes.owners.$A1, [69, 72, 76, 83]);
+
+    assert.deepEqual(integration.processLifecycle(first, "focus_lost"), [
+        noteOff(60), noteOff(64), noteOff(67),
+        {type: "control_change", controller: 123, value: 0}
+    ]);
+    assert.deepEqual(second.notes.owners.$A1, [69, 72, 76, 83]);
+    assert.equal(second.ledActive, true);
+    assert.equal(second.musical.chordType, "minor");
+    assert.deepEqual(integration.processGridEvent(second, "A1", 0), [
+        noteOff(69), noteOff(72), noteOff(76), noteOff(83)
+    ]);
+});
+
+test("C Major to C Minor to A Minor changes preserve a held owner snapshot", () => {
+    const runtime = integration.createRuntime();
+    assert.deepEqual(integration.processGridEvent(runtime, "A1", 88), [
+        noteOn(60, 88), noteOn(64, 88), noteOn(67, 88)
+    ]);
+    integration.applyScaleSnapshot(runtime, 0, [0, 2, 3, 5, 7, 8, 10]);
+    integration.applyScaleSnapshot(runtime, 9, [0, 2, 3, 5, 7, 8, 10]);
+    assert.deepEqual(integration.processGridEvent(runtime, "A1", 0), [
+        noteOff(60), noteOff(64), noteOff(67)
+    ]);
+    assert.deepEqual(integration.processGridEvent(runtime, "A1", 99), [
+        noteOn(69, 99), noteOn(72, 99), noteOn(76, 99)
+    ]);
+    assert.deepEqual(integration.processGridEvent(runtime, "A1", 0), [
+        noteOff(69), noteOff(72), noteOff(76)
+    ]);
+});
+
+test("30-minute-equivalent hardening sequence leaves no unmatched notes", () => {
+    const runtime = integration.createRuntime();
+    const sounding = new Set();
+    const scales = [
+        [0, [0, 2, 4, 5, 7, 9, 11]],
+        [0, [0, 2, 3, 5, 7, 8, 10]],
+        [9, [0, 2, 3, 5, 7, 8, 10]]
+    ];
+    const lifecycles = ["focus_lost", "disabled", "reload", "deleted", "set_closed"];
+    let eventCount = 0;
+
+    function record(events) {
+        events.forEach((event) => {
+            eventCount += 1;
+            if (event.type === "note_on") {
+                assert.equal(sounding.has(event.pitch), false, `duplicate note-on ${event.pitch}`);
+                sounding.add(event.pitch);
+            } else if (event.type === "note_off") {
+                assert.equal(sounding.delete(event.pitch), true, `unmatched note-off ${event.pitch}`);
+            } else {
+                assert.deepEqual(event, {type: "control_change", controller: 123, value: 0});
+                assert.equal(sounding.size, 0);
+            }
+        });
+    }
+
+    integration.processGridEvent(runtime, "D7", 100);
+    integration.processGridEvent(runtime, "D7", 0);
+    for (let second = 0; second < 30 * 60; second += 1) {
+        const velocity = (second % 127) + 1;
+        const first = `${"ABCDEFGH"[second % 8]}${(second % 4) + 1}`;
+        const secondCoordinate = `${"ABCDEFGH"[(second + 2) % 8]}${(second % 4) + 1}`;
+        record(integration.processGridEvent(runtime, first, velocity));
+        record(integration.processGridEvent(runtime, secondCoordinate, 127 - (second % 126)));
+        if (second % 3 === 0) {
+            const [root, intervals] = scales[Math.floor(second / 3) % scales.length];
+            integration.applyScaleSnapshot(runtime, root, intervals);
+        }
+        if (second % 37 === 0) {
+            record(integration.processLifecycle(
+                runtime,
+                lifecycles[Math.floor(second / 37) % lifecycles.length]
+            ));
+        } else {
+            record(integration.processGridEvent(runtime, first, 0));
+            record(integration.processGridEvent(runtime, secondCoordinate, 0));
+        }
+        assert.equal(sounding.size, 0, `notes remain after simulated second ${second}`);
+    }
+
+    assert.ok(eventCount > 10000);
+    assert.deepEqual(runtime.notes.owners, Object.create(null));
+    assert.deepEqual(runtime.notes.counts, Object.create(null));
+    assert.equal(sounding.size, 0);
 });
 
 test("lifecycle clears held modifiers but preserves voicing and bass selections", () => {

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Interactive usage guide and approved feature direction for Push Chord Grid v0.4.7.">
+  <meta name="description" content="Interactive usage guide and approved feature direction for Push Chord Grid v0.5.1 RC.">
   <title>Push Chord Grid — Usage &amp; Next Features</title>
   <style>
     :root {
@@ -737,7 +737,7 @@
         <p class="lede">Push Chord Grid turns the lower half of Push into four octaves of scale-correct chords. Live owns the key. You choose the degree, voicing, nearest movement, color, and bass.</p>
       </div>
       <aside class="hero-card" aria-label="Current build summary">
-        <div class="version"><strong>0.4.7</strong><span>WP4 follow-up</span></div>
+        <div class="version"><strong>0.5.1 RC</strong><span>Push display + WP5 hardening</span></div>
         <div class="facts">
           <div class="fact">32 chord pads</div>
           <div class="fact">4 octaves</div>
@@ -933,10 +933,21 @@
             <p>Re-enabling the device automatically rediscovers Push. If the hardware was power-cycled and the matrix stays dark, click Reload Grid: it safely releases stale ownership, rediscovers the matrix, reacquires it, and repaints every pad.</p>
           </article>
           <article class="usage-card">
+            <span class="mini">DUPLICATE SAFE</span>
+            <h3>One grid owner, even with copied devices</h3>
+            <p>The first eligible copy in the selected track’s device order reports matrix acquired. Other copies report duplicate standby and emit no grid-generated notes or LEDs. Reorder, disable, or change focus and ownership transfers only after a complete note and light flush.</p>
+          </article>
+          <article class="usage-card">
             <span class="mini">EXACT FEEDBACK</span>
             <h3>See what the device actually emitted</h3>
             <p>The device face separately shows current controls and the last chord’s name, resolved quality/extensions, manual or Nearest inversion, and every emitted note name with its MIDI number.</p>
             <div class="device-readout" aria-label="Example device feedback"><span>Scale C Minor | Chord: Auto | Voice 0 | Nearest on | Bass off | Ext 9</span><span>Last: Fm | Quality Min | Ext 9 | Inv VL -1 | MIDI C3(60) F3(65) G3(67) G#3(68)</span></div>
+          </article>
+          <article class="usage-card">
+            <span class="mini">PUSH SCREEN · PLAYING</span>
+            <h3>See the held chord without looking at Live</h3>
+            <p>Push’s first device bank shows Base Octave and Playing. Playing reports the newest held chord’s exact root, resolved quality, and complete 6/m7/M7/9 stack. Release the newest overlap and the previous held chord reappears; release the last chord or lose focus and it returns to --.</p>
+            <div class="device-readout" aria-label="Example Push parameter bank"><span>Base Octave&nbsp;&nbsp;2</span><span>Playing&nbsp;&nbsp;Cm +m7+9</span></div>
           </article>
         </div>
         <div class="callout"><strong>Lighting:</strong> blue-family pads are playable chords, brighter tonic pads mark degrees 1 and 8, controls use distinct families, held chords turn white, and reserved pads stay dark.</div>
@@ -947,7 +958,7 @@
       <div class="shell">
         <div class="section-head">
           <div><p class="kicker">Shipped + roadmap</p><h2>More expression.<br>No bloat.</h2></div>
-          <p class="section-intro">v0.4.7 includes Nearest voice leading, exact chord feedback, and corrected live scale-change detection. The other cards are proposed or approved directions inspired by Orchid, kept separate from current behavior so you can see exactly what exists today and what may come next.</p>
+          <p class="section-intro">v0.5.1 includes the Push Playing display, Nearest voice leading, exact chord feedback, live scale-change detection, and duplicate-safe matrix ownership. The other cards are proposed or approved directions inspired by Orchid, kept separate from current behavior so you can see exactly what exists today and what may come next.</p>
         </div>
 
         <div class="chain" aria-label="Recommended Ableton device chain">
@@ -967,6 +978,7 @@
           <article class="feature"><span class="feature-status">Approved explore</span><h3>Performance snapshots</h3><p>Store and recall a few combinations of voicing, bass register, and extension state. This makes dramatic harmonic changes immediate without turning the grid into a menu.</p><span class="placement">Candidate area: reserved pads</span></article>
           <article class="feature"><span class="feature-status">Approved explore</span><h3>Separate bass output</h3><p>Optionally route the added bass voice separately from the chord voices so each can reach a different Live instrument or MIDI path.</p><span class="placement">Needs Standalone-safe routing design</span></article>
           <article class="feature"><span class="feature-status">Implemented · 0.4.6</span><h3>Clearer chord feedback</h3><p>The device face shows the last chord name, extension stack, inversion, and exact emitted pitch snapshot.</p><span class="placement">Dedicated device line</span></article>
+          <article class="feature"><span class="feature-status">Implemented · 0.5.1</span><h3>Push Playing display</h3><p>The first Push bank shows the newest held exact chord and falls back through overlapping holds without recalculating them.</p><span class="placement">Push bank slot 2</span></article>
         </div>
 
         <div class="boundary" id="boundary">
@@ -989,7 +1001,7 @@
 
   <footer>
     <div class="shell footer-inner">
-      <span>Push Chord Grid v0.4.7 · Usage and approved-direction guide · 2026-08-18</span>
+      <span>Push Chord Grid v0.5.1 RC · Usage and approved-direction guide · 2026-08-18</span>
       <span class="footer-links"><a href="ORCHID_ADAPTATION.md">Orchid study</a><a href="HARDWARE_TESTS.md">Hardware card</a><a href="../README.md">Project README</a></span>
     </div>
   </footer>

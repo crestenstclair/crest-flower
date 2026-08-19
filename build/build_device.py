@@ -26,6 +26,30 @@ RUNTIME_FILES = (
     "runtime-adapter.js",
     "state.js",
 )
+DISPLAY_NOTE_NAMES = (
+    "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
+)
+DISPLAY_QUALITY_SUFFIXES = ("", "m", "dim", "sus", "auto")
+DISPLAY_EXTENSION_LABELS = ("6", "m7", "M7", "9")
+
+
+def playing_display_labels() -> list[str]:
+    """Return the complete deterministic enum table used by Push's Playing display."""
+    labels = ["--"]
+    for root in DISPLAY_NOTE_NAMES:
+        for quality_suffix in DISPLAY_QUALITY_SUFFIXES:
+            for mask in range(16):
+                extensions = [
+                    label
+                    for index, label in enumerate(DISPLAY_EXTENSION_LABELS)
+                    if mask & (1 << index)
+                ]
+                labels.append(
+                    root
+                    + quality_suffix
+                    + (f" +{'+'.join(extensions)}" if extensions else "")
+                )
+    return labels
 
 
 def _runtime_source(filename: str) -> Path:
@@ -186,6 +210,45 @@ def create_device() -> MidiEffect:
         position=0,
         bank_name="Push Chord Grid",
     )
+    playing_display = device.add_box(
+        {
+            "box": {
+                "id": "playing-display",
+                "maxclass": "live.tab",
+                "varname": "Playing",
+                "numinlets": 1,
+                "numoutlets": 3,
+                "outlettype": ["", "", "float"],
+                "parameter_enable": 1,
+                "parameter_mappable": 0,
+                "active": 0,
+                "patching_rect": [800, 350, 180, 20],
+                "saved_attribute_attributes": {
+                    "valueof": {
+                        "parameter_longname": "Playing",
+                        "parameter_shortname": "Playing",
+                        "parameter_type": 2,
+                        "parameter_mmin": 0,
+                        "parameter_mmax": 960,
+                        "parameter_initial_enable": 1,
+                        "parameter_initial": [0],
+                        "parameter_unitstyle": 9,
+                        "parameter_enum": playing_display_labels(),
+                    }
+                },
+                "annotation_name": "Playing",
+                "annotation": (
+                    "Exact newest-held chord shown in Push's device parameter bank."
+                ),
+            }
+        }
+    )
+    device.assign_parameter_bank(
+        playing_display,
+        bank=0,
+        position=1,
+        bank_name="Push Chord Grid",
+    )
     device.add_dsp(*midi_thru("thru"))
 
     for filename in RUNTIME_FILES:
@@ -201,7 +264,7 @@ def create_device() -> MidiEffect:
         "runtime-adapter",
         "js runtime-adapter.js",
         numinlets=1,
-        numoutlets=5,
+        numoutlets=6,
         patching_rect=[350, 300, 156, 22],
     )
     device.add_newobj(
@@ -231,6 +294,13 @@ def create_device() -> MidiEffect:
         numinlets=1,
         numoutlets=1,
         patching_rect=[790, 140, 133, 22],
+    )
+    device.add_newobj(
+        "arbitration-receive",
+        "receive push_chord_grid_arbitration",
+        numinlets=0,
+        numoutlets=1,
+        patching_rect=[940, 140, 220, 22],
     )
     device.add_subpatcher(
         create_push_native_adapter(),
@@ -344,6 +414,13 @@ def create_device() -> MidiEffect:
         patching_rect=[610, 350, 72, 22],
     )
     device.add_newobj(
+        "prepend-playing-set",
+        "prepend set",
+        numinlets=1,
+        numoutlets=1,
+        patching_rect=[700, 350, 72, 22],
+    )
+    device.add_newobj(
         "prepend-base-octave",
         "prepend base_octave",
         numinlets=1,
@@ -410,6 +487,7 @@ def create_device() -> MidiEffect:
     device.add_line("thru_midiin", 0, "push-midi-parse", 0)
     device.add_line("push-midi-parse", 0, "prepend-pad-velocity", 0)
     device.add_line("prepend-pad-velocity", 0, "push-grid-adapter", 0)
+    device.add_line("arbitration-receive", 0, "push-grid-adapter", 0)
     device.add_line("live-scale-adapter", 0, "runtime-adapter", 0)
     device.add_line("runtime-adapter", 0, "generated-midi-format", 0)
     device.add_line("runtime-adapter", 1, "generated-midi-format", 2)
@@ -417,8 +495,10 @@ def create_device() -> MidiEffect:
     device.add_line("runtime-adapter", 2, "prepend-selection-set", 0)
     device.add_line("runtime-adapter", 3, "push-native-adapter", 2)
     device.add_line("runtime-adapter", 4, "prepend-feedback-set", 0)
+    device.add_line("runtime-adapter", 5, "prepend-playing-set", 0)
     device.add_line("prepend-selection-set", 0, "selection-display", 0)
     device.add_line("prepend-feedback-set", 0, "feedback-display", 0)
+    device.add_line("prepend-playing-set", 0, playing_display, 0)
     return device
 
 

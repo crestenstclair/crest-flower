@@ -17,7 +17,7 @@ if (typeof module !== "undefined" && module.exports) {
 if (typeof outlet !== "undefined") {
     autowatch = 0;
     inlets = 1;
-    outlets = 5;
+    outlets = 6;
 }
 
 var FILES = "ABCDEFGH";
@@ -50,6 +50,8 @@ var EXTENSION_LABELS = {
     major_seventh: "M7",
     ninth: "9"
 };
+var DISPLAY_QUALITY_ORDER = ["major", "minor", "diminished", "suspended", "auto"];
+var DISPLAY_EXTENSION_ORDER = ["sixth", "minor_seventh", "major_seventh", "ninth"];
 var LED_COLORS = {
     off: 0,
     dimNeutral: 1,
@@ -125,7 +127,9 @@ function createRuntime(options) {
         ledCache: emptyMap(),
         scaleName: "Major",
         scaleMode: 1,
-        lastChordSnapshot: null
+        lastChordSnapshot: null,
+        activeChordSnapshots: emptyMap(),
+        activeChordOrder: []
     };
 }
 
@@ -230,6 +234,8 @@ function processGridEvent(runtime, coordinate, velocity) {
     }
     if (!pressed) {
         delete runtime.held[coordinate];
+        delete runtime.activeChordSnapshots[coordinate];
+        runtime.activeChordOrder = removeCoordinate(runtime.activeChordOrder, coordinate);
         return runtimeActiveNotes.releaseOwner(runtime.notes, coordinate);
     }
     snapshot = runtimeMusicalState.chordSnapshotForPad(
@@ -238,8 +244,13 @@ function processGridEvent(runtime, coordinate, velocity) {
         parsed.column
     );
     runtime.held[coordinate] = true;
+    runtime.activeChordOrder = removeCoordinate(runtime.activeChordOrder, coordinate);
     if (snapshot !== null) {
         runtime.lastChordSnapshot = snapshot;
+        runtime.activeChordSnapshots[coordinate] = snapshot;
+        runtime.activeChordOrder.push(coordinate);
+    } else {
+        delete runtime.activeChordSnapshots[coordinate];
     }
     return runtimeActiveNotes.pressOwner(
         runtime.notes,
@@ -255,6 +266,8 @@ function processLifecycle(runtime, lifecycle) {
     runtime.heldQualities = emptyMap();
     runtime.qualityOrder = [];
     runtime.lastChordSnapshot = null;
+    runtime.activeChordSnapshots = emptyMap();
+    runtime.activeChordOrder = [];
     runtimeMusicalState.resetMomentaryModifiers(runtime.musical);
     return runtimeActiveNotes.flushForLifecycle(runtime.notes, lifecycle);
 }
@@ -394,6 +407,95 @@ var QUALITY_SUFFIXES = {
     major: "",
     suspended: "sus"
 };
+var DISPLAY_QUALITY_SUFFIXES = {
+    auto: "auto",
+    diminished: "dim",
+    minor: "m",
+    major: "",
+    suspended: "sus"
+};
+
+function activeChordSnapshot(runtime) {
+    if (runtime.activeChordOrder.length === 0) {
+        return null;
+    }
+    return runtime.activeChordSnapshots[
+        runtime.activeChordOrder[runtime.activeChordOrder.length - 1]
+    ] || null;
+}
+
+function displayExtensionMask(extensions) {
+    var mask = 0;
+    extensions.forEach(function (extension) {
+        var index = DISPLAY_EXTENSION_ORDER.indexOf(extension);
+        if (index === -1) {
+            throw new RangeError("unknown chord extension in display snapshot");
+        }
+        mask += Math.pow(2, index);
+    });
+    return mask;
+}
+
+function playingDisplayCodeForSnapshot(snapshot) {
+    if (snapshot === null) {
+        return 0;
+    }
+    var qualityIndex = DISPLAY_QUALITY_ORDER.indexOf(snapshot.resolvedQuality);
+    if (qualityIndex === -1) {
+        throw new RangeError("unknown resolved chord quality in display snapshot");
+    }
+    var rootPitchClass = ((snapshot.rootPitch % 12) + 12) % 12;
+    return 1 + rootPitchClass * 80 + qualityIndex * 16 +
+        displayExtensionMask(snapshot.extensions);
+}
+
+function playingDisplayCode(runtime) {
+    return playingDisplayCodeForSnapshot(activeChordSnapshot(runtime));
+}
+
+function playingDisplayLabelForSnapshot(snapshot) {
+    if (snapshot === null) {
+        return "--";
+    }
+    var root = NOTE_NAMES[((snapshot.rootPitch % 12) + 12) % 12];
+    var suffix = DISPLAY_QUALITY_SUFFIXES[snapshot.resolvedQuality];
+    if (suffix === undefined) {
+        throw new RangeError("unknown resolved chord quality in display snapshot");
+    }
+    var extensions = DISPLAY_EXTENSION_ORDER.filter(function (extension) {
+        return snapshot.extensions.indexOf(extension) !== -1;
+    }).map(function (extension) {
+        return EXTENSION_LABELS[extension];
+    });
+    return root + suffix + (extensions.length ? " +" + extensions.join("+") : "");
+}
+
+function playingDisplayLabel(runtime) {
+    return playingDisplayLabelForSnapshot(activeChordSnapshot(runtime));
+}
+
+function playingDisplayLabels() {
+    var labels = ["--"];
+    var root;
+    var quality;
+    var mask;
+    var extensions;
+    for (root = 0; root < NOTE_NAMES.length; root += 1) {
+        for (quality = 0; quality < DISPLAY_QUALITY_ORDER.length; quality += 1) {
+            for (mask = 0; mask < 16; mask += 1) {
+                extensions = DISPLAY_EXTENSION_ORDER.filter(function (extension, index) {
+                    return (mask & Math.pow(2, index)) !== 0;
+                });
+                labels.push(playingDisplayLabelForSnapshot({
+                    rootPitch: root,
+                    resolvedQuality: DISPLAY_QUALITY_ORDER[quality],
+                    extensions: extensions
+                }));
+            }
+        }
+    }
+    return labels;
+}
 
 function signedInteger(value) {
     return value > 0 ? "+" + value : String(value);
@@ -453,6 +555,12 @@ function emitFeedback() {
     }
 }
 
+function emitPlaying() {
+    if (typeof outlet !== "undefined") {
+        outlet(5, playingDisplayCode(maxRuntime));
+    }
+}
+
 function emitLedEvents(events) {
     if (typeof outlet === "undefined") {
         return;
@@ -470,6 +578,7 @@ function grid_event(coordinate, velocity) {
     }
     if (role === "chord") {
         emitFeedback();
+        emitPlaying();
     }
     emitLedEvents(renderLedDiff(maxRuntime));
 }
@@ -478,6 +587,7 @@ function lifecycle(name) {
     emitEvents(processLifecycle(maxRuntime, String(name)));
     emitSelection();
     emitFeedback();
+    emitPlaying();
     emitLedEvents(renderLedDiff(maxRuntime));
 }
 
@@ -522,6 +632,7 @@ if (typeof module !== "undefined" && module.exports) {
         QUALITY_CONTROLS: QUALITY_CONTROLS,
         VOICING_CONTROLS: VOICING_CONTROLS,
         VOICE_LEADING_CONTROL: VOICE_LEADING_CONTROL,
+        activeChordSnapshot: activeChordSnapshot,
         applyScaleSnapshot: applyScaleSnapshot,
         createRuntime: createRuntime,
         feedbackText: feedbackText,
@@ -530,6 +641,11 @@ if (typeof module !== "undefined" && module.exports) {
         ledFrame: ledFrame,
         ledPosition: ledPosition,
         parsedCoordinate: parsedCoordinate,
+        playingDisplayCode: playingDisplayCode,
+        playingDisplayCodeForSnapshot: playingDisplayCodeForSnapshot,
+        playingDisplayLabel: playingDisplayLabel,
+        playingDisplayLabelForSnapshot: playingDisplayLabelForSnapshot,
+        playingDisplayLabels: playingDisplayLabels,
         processGridEvent: processGridEvent,
         processLifecycle: processLifecycle,
         renderLedDiff: renderLedDiff,

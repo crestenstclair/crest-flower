@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Parse and statically validate the generated WP4 AMXD artifact."""
+"""Parse and statically validate the generated WP5 AMXD artifact."""
 
 from __future__ import annotations
 
@@ -22,15 +22,39 @@ from m4l_builder.freeze import extract_frozen_amxd  # noqa: E402
 from build.max_objects import (  # noqa: E402
     FORBIDDEN_OBJECTS,
     FORBIDDEN_PREFIXES,
-    WP4_ALLOWED_MAXCLASSES,
-    WP4_ALLOWED_NEWOBJS,
-    WP4_EMBEDDED_RUNTIME_FILES,
+    WP5_ALLOWED_MAXCLASSES,
+    WP5_ALLOWED_NEWOBJS,
+    WP5_EMBEDDED_RUNTIME_FILES,
 )
 
 AMXD_MAGIC = b"ampf"
 AMXD_VERSION = 4
 MIDI_EFFECT_CODE = b"mmmm"
 MIDI_EFFECT_PROJECT_TYPE = 1835887981
+DISPLAY_NOTE_NAMES = (
+    "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
+)
+DISPLAY_QUALITY_SUFFIXES = ("", "m", "dim", "sus", "auto")
+DISPLAY_EXTENSION_LABELS = ("6", "m7", "M7", "9")
+
+
+def expected_playing_display_labels() -> list[str]:
+    """Generate the required Playing enum independently from the device builder."""
+    labels = ["--"]
+    for root in DISPLAY_NOTE_NAMES:
+        for quality_suffix in DISPLAY_QUALITY_SUFFIXES:
+            for mask in range(16):
+                extensions = [
+                    label
+                    for index, label in enumerate(DISPLAY_EXTENSION_LABELS)
+                    if mask & (1 << index)
+                ]
+                labels.append(
+                    root
+                    + quality_suffix
+                    + (f" +{'+'.join(extensions)}" if extensions else "")
+                )
+    return labels
 
 
 class AmxdValidationError(ValueError):
@@ -134,7 +158,7 @@ def _root_patcher(document: AmxdDocument) -> dict[str, Any]:
 
 
 def validate_document(document: AmxdDocument) -> list[str]:
-    """Return all WP4 policy violations for a parsed document."""
+    """Return all WP5 policy violations for a parsed document."""
     errors: list[str] = []
     if document.version != AMXD_VERSION:
         errors.append(f"container version is {document.version}, expected {AMXD_VERSION}")
@@ -144,7 +168,7 @@ def validate_document(document: AmxdDocument) -> list[str]:
         struct.unpack("<I", document.metadata)[0] if len(document.metadata) == 4 else None
     )
     if frozen_marker != 7:
-        errors.append("WP4 artifact is not frozen/self-contained")
+        errors.append("WP5 artifact is not frozen/self-contained")
 
     try:
         patcher = _root_patcher(document)
@@ -168,10 +192,10 @@ def validate_document(document: AmxdDocument) -> list[str]:
             name.startswith(prefix) for prefix in FORBIDDEN_PREFIXES
         ):
             errors.append(f"forbidden runtime object: {name}")
-        if maxclass not in WP4_ALLOWED_MAXCLASSES:
-            errors.append(f"undeclared WP4 maxclass: {maxclass}")
-        if maxclass == "newobj" and name not in WP4_ALLOWED_NEWOBJS:
-            errors.append(f"undeclared WP4 newobj: {name}")
+        if maxclass not in WP5_ALLOWED_MAXCLASSES:
+            errors.append(f"undeclared WP5 maxclass: {maxclass}")
+        if maxclass == "newobj" and name not in WP5_ALLOWED_NEWOBJS:
+            errors.append(f"undeclared WP5 newobj: {name}")
 
     dependencies = patcher.get("dependency_cache", [])
     declared_dependencies = {
@@ -180,14 +204,14 @@ def validate_document(document: AmxdDocument) -> list[str]:
     embedded_dependencies = {
         name for name in document.embedded_files if not name.lower().endswith(".amxd")
     }
-    if declared_dependencies != WP4_EMBEDDED_RUNTIME_FILES:
+    if declared_dependencies != WP5_EMBEDDED_RUNTIME_FILES:
         errors.append(
-            "WP4 dependency cache does not exactly declare the integrated runtime: "
+            "WP5 dependency cache does not exactly declare the integrated runtime: "
             f"{sorted(declared_dependencies)}"
         )
-    if embedded_dependencies != WP4_EMBEDDED_RUNTIME_FILES:
+    if embedded_dependencies != WP5_EMBEDDED_RUNTIME_FILES:
         errors.append(
-            "WP4 frozen payload does not exactly embed the integrated runtime: "
+            "WP5 frozen payload does not exactly embed the integrated runtime: "
             f"{sorted(embedded_dependencies)}"
         )
     external_dependencies = declared_dependencies - embedded_dependencies
@@ -218,13 +242,14 @@ def validate_document(document: AmxdDocument) -> list[str]:
             "prepend initialized": 1,
             "prepend pad_velocity": 1,
             "prepend reload": 1,
-            "prepend set": 4,
+            "prepend set": 5,
+            "receive push_chord_grid_arbitration": 1,
             "sel 1": 1,
             "t b b": 1,
         }
     )
     if actual_newobjs != expected_newobjs:
-        errors.append(f"unexpected WP4 newobj graph: {dict(sorted(actual_newobjs.items()))}")
+        errors.append(f"unexpected WP5 newobj graph: {dict(sorted(actual_newobjs.items()))}")
 
     lines = [entry.get("patchline", {}) for entry in patcher.get("lines", [])]
     for line in lines:
@@ -258,7 +283,7 @@ def validate_document(document: AmxdDocument) -> list[str]:
         expected_parameter_line not in normalized_lines
         or expected_midi_line not in normalized_lines
     ):
-        errors.append("WP4 graph does not preserve parameter input and raw MIDI passthrough")
+        errors.append("WP5 graph does not preserve parameter input and raw MIDI passthrough")
 
     required_edges = {
         ("device-lifecycle", 0, "prepend-initialized", 0),
@@ -287,6 +312,7 @@ def validate_document(document: AmxdDocument) -> list[str]:
         ("thru_midiin", 0, "push-midi-parse", 0),
         ("push-midi-parse", 0, "prepend-pad-velocity", 0),
         ("prepend-pad-velocity", 0, "push-grid-adapter", 0),
+        ("arbitration-receive", 0, "push-grid-adapter", 0),
         ("live-scale-adapter", 0, "runtime-adapter", 0),
         ("runtime-adapter", 0, "generated-midi-format", 0),
         ("runtime-adapter", 1, "generated-midi-format", 2),
@@ -294,8 +320,10 @@ def validate_document(document: AmxdDocument) -> list[str]:
         ("runtime-adapter", 2, "prepend-selection-set", 0),
         ("runtime-adapter", 3, "push-native-adapter", 2),
         ("runtime-adapter", 4, "prepend-feedback-set", 0),
+        ("runtime-adapter", 5, "prepend-playing-set", 0),
         ("prepend-selection-set", 0, "selection-display", 0),
         ("prepend-feedback-set", 0, "feedback-display", 0),
+        ("prepend-playing-set", 0, "playing-display", 0),
         ("base-octave", 0, "prepend-base-octave", 0),
         ("prepend-base-octave", 0, "runtime-adapter", 0),
     }
@@ -309,9 +337,13 @@ def validate_document(document: AmxdDocument) -> list[str]:
         for line in lines
     }
     if not required_edges.issubset(actual_edges):
-        errors.append("WP4 scale/grid/MIDI/lifecycle graph is incomplete")
-    if len(lines) != 38:
-        errors.append(f"WP4 root graph has {len(lines)} patchlines, expected 38")
+        errors.append("WP5 scale/grid/MIDI/lifecycle graph is incomplete")
+    if len(lines) != 41:
+        errors.append(f"WP5 root graph has {len(lines)} patchlines, expected 41")
+
+    runtime_box = next((box for box in root_boxes if box.get("id") == "runtime-adapter"), None)
+    if runtime_box is None or runtime_box.get("numoutlets") != 6:
+        errors.append("runtime adapter does not expose the Playing display outlet")
 
     reload_buttons = [
         box
@@ -319,7 +351,7 @@ def validate_document(document: AmxdDocument) -> list[str]:
         if box.get("id") == "reload-grid-button" and box.get("maxclass") == "textbutton"
     ]
     if len(reload_buttons) != 1 or reload_buttons[0].get("text") != "Reload Grid":
-        errors.append("WP4 device does not expose exactly one Reload Grid button")
+        errors.append("WP5 device does not expose exactly one Reload Grid button")
 
     comments = {
         str(box.get("id")): str(box.get("text"))
@@ -329,34 +361,63 @@ def validate_document(document: AmxdDocument) -> list[str]:
     expected_comments = {
         "last-pad-display": "Pad: --",
         "matrix-status-display": "Status: waiting for Live",
-        "selection-display": "Scale C Major | Chord: Auto | Voice 0 | Nearest off | Bass off | Ext -",
+        "selection-display": (
+            "Scale C Major | Chord: Auto | Voice 0 | Nearest off | Bass off | Ext -"
+        ),
         "feedback-display": "Last: --",
     }
     if comments != expected_comments:
-        errors.append(f"WP4 status displays are unexpected: {comments!r}")
+        errors.append(f"WP5 status displays are unexpected: {comments!r}")
 
     parameters = [box for box in boxes if box.get("parameter_enable") == 1]
-    if len(parameters) != 1:
-        errors.append(f"expected one stored parameter, found {len(parameters)}")
-    else:
-        parameter = parameters[0]
+    if len(parameters) != 2:
+        errors.append(f"expected two stored parameters, found {len(parameters)}")
+    parameters_by_name = {str(box.get("varname")): box for box in parameters}
+    if set(parameters_by_name) != {"Base Octave", "Playing"}:
+        errors.append(f"stored parameter inventory is unexpected: {sorted(parameters_by_name)}")
+
+    parameter = parameters_by_name.get("Base Octave")
+    if parameter is not None:
         if parameter.get("maxclass") != "live.dial":
-            errors.append("stored parameter is not a live.dial")
-        if parameter.get("varname") != "Base Octave":
-            errors.append(f"stored parameter name is {parameter.get('varname')!r}")
+            errors.append("Base Octave parameter is not a live.dial")
         valueof = parameter.get("saved_attribute_attributes", {}).get("valueof", {})
         if valueof.get("parameter_initial") != [3]:
             errors.append("Base Octave initial value is not 3")
         if valueof.get("parameter_mmin") != 0 or valueof.get("parameter_mmax") != 8:
             errors.append("Base Octave range is not 0..8")
 
+    playing = parameters_by_name.get("Playing")
+    if playing is not None:
+        playing_valueof = playing.get("saved_attribute_attributes", {}).get("valueof", {})
+        if playing.get("maxclass") != "live.tab":
+            errors.append("Playing parameter is not a live.tab")
+        if playing.get("active") != 0 or playing.get("parameter_mappable") != 0:
+            errors.append("Playing parameter is not inactive and non-mappable")
+        if playing_valueof.get("parameter_type") != 2:
+            errors.append("Playing parameter is not enumerated")
+        if playing_valueof.get("parameter_initial") != [0]:
+            errors.append("Playing initial value is not blank")
+        if (
+            playing_valueof.get("parameter_mmin") != 0
+            or playing_valueof.get("parameter_mmax") != 960
+        ):
+            errors.append("Playing range is not 0..960")
+        if playing_valueof.get("parameter_enum") != expected_playing_display_labels():
+            errors.append("Playing enum labels do not match the deterministic chord table")
+
+    outgoing_from_playing = [
+        line for line in lines if line.get("source", [None])[0] == "playing-display"
+    ]
+    if outgoing_from_playing:
+        errors.append("Playing display unexpectedly drives the musical graph")
+
     bank = patcher.get("parameters", {}).get("parameterbanks", {}).get("0", {})
     bank_parameters = bank.get("parameters", [])
     if bank.get("name") != "Push Chord Grid":
         errors.append("Push parameter bank 0 has the wrong name")
-    if len(bank_parameters) != 8 or bank_parameters[0] != "Base Octave":
-        errors.append("Base Octave is not in Push parameter bank 0 slot 0")
-    if any(value != "-" for value in bank_parameters[1:]):
+    if len(bank_parameters) != 8 or bank_parameters[:2] != ["Base Octave", "Playing"]:
+        errors.append("Base Octave and Playing are not in Push bank slots 0 and 1")
+    if any(value != "-" for value in bank_parameters[2:]):
         errors.append("unused Push parameter bank slots are not empty")
 
     return errors
@@ -409,7 +470,7 @@ def main() -> int:
     if args.as_json:
         print(json.dumps(result, indent=2, sort_keys=True))
     else:
-        print(f"valid WP4 AMXD: {args.artifact}")
+        print(f"valid WP5 AMXD: {args.artifact}")
     return 0
 
 

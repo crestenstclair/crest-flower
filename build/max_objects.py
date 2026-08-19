@@ -1,6 +1,6 @@
 """Project-owned Max object policy shared by generators and validators."""
 
-WP4_ALLOWED_NEWOBJS = frozenset(
+WP5_ALLOWED_NEWOBJS = frozenset(
     {
         "append",
         "deferlow",
@@ -16,17 +16,19 @@ WP4_ALLOWED_NEWOBJS = frozenset(
         "midiparse",
         "p",
         "prepend",
+        "receive",
         "route",
         "sel",
         "t",
         "zl",
     }
 )
-WP4_ALLOWED_MAXCLASSES = frozenset(
+WP5_ALLOWED_MAXCLASSES = frozenset(
     {
         "inlet",
         "live.comment",
         "live.dial",
+        "live.tab",
         "message",
         "newobj",
         "outlet",
@@ -34,7 +36,7 @@ WP4_ALLOWED_MAXCLASSES = frozenset(
         "textbutton",
     }
 )
-WP4_EMBEDDED_RUNTIME_FILES = frozenset(
+WP5_EMBEDDED_RUNTIME_FILES = frozenset(
     {
         "active-notes.js",
         "harmony.js",
