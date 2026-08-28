@@ -30,6 +30,19 @@ grid music; other copies report `Status: duplicate standby`. Reordering, disabli
 deleting, or changing focus transfers ownership only after the outgoing instance
 flushes notes, clears LEDs, and releases its lease.
 
+## Download and install
+
+Download `PushChordGrid.amxd` from the
+[v0.5.2 RC release](https://github.com/crestenstclair/crest-flower/releases/tag/v0.5.2-RC),
+then drag it onto a MIDI track in Ableton Live 12. Put an instrument after the device
+or route the track's Post-FX MIDI to an instrument track, select the source track, and
+play from Push's Session grid. The release ZIP also includes the reviewed Live Set,
+offline usage guide, hardware acceptance card, manifest, changelog, and checksums.
+
+This is a release candidate: automated, static, reproducibility, and Live-side gates
+pass, while the irreducible physical 30-minute Push observation remains pending. Push
+3 Standalone transfer and cold-boot acceptance are deferred to WP6.
+
 ## Build
 
 Requirements: Python 3.11+, Node 23.11.0, Git, and network access for the one-time

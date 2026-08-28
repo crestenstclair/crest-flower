@@ -20,9 +20,9 @@
   },
   "project": "push-chord-grid",
   "release_set": {
-    "bytes": 23853,
+    "bytes": 23859,
     "path": "PushChordGrid-v0.5.2-RC.als",
-    "sha256": "f0364dbbbe1e9f4f7679dca638780baa91f0c152f484fd161b7a22f269f633a9"
+    "sha256": "151ded3fd27ae124cba9dc196c5afd83f82c31a1a2a7f4a1dd9ef39f8fb194b6"
   },
   "runtime_dependencies": [],
   "schema_version": 1,
