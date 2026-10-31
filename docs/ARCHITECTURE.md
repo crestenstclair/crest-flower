@@ -109,8 +109,8 @@ argument, while initial `get` values may be direct or property-prefixed; the ada
 normalizes both shapes before parsing and forwarding one complete scale snapshot.
 
 `runtime-adapter.js` is the only coordinate-to-music boundary. It classifies all 64
-pads: 32 chords, four quality controls, four extension controls, three chord-voicing
-controls, one Nearest control, three bass-register controls, one bass toggle, and 16
+pads: 32 chords, eight quality controls, three extension controls, three chord-voicing
+controls, one Nearest control, three bass-register controls, one bass toggle, and 13
 reserved pads. Controls
 and reserved pads return no note-on. Musical presses enter
 the accepted WP3 engine, and releases use the exact stored owner snapshot.
@@ -135,8 +135,7 @@ All six JavaScript runtime files are embedded in the reproducibly frozen AMXD.
 `runtime-adapter.js` keeps a coordinate-keyed map of the exact sounding owner
 snapshots plus a newest-held order. Its sixth outlet emits a
 deterministic code whenever a chord is pressed, retriggered, released, or flushed.
-Code 0 is `--`; codes 1–960 cover 12 roots, five resolved qualities, and all 16
-6/m7/M7/9 masks. Releasing the newest overlap exposes the previous stored snapshot,
+Code 0 is `--`; codes 1–3120 cover the supported root/quality/contextual 6/7/9 identities. Releasing the newest overlap exposes the previous stored snapshot,
 so future-trigger-only controls or scale changes cannot relabel a chord that is still
 sounding; live quality/extension edges update every stored sounding snapshot.
 
@@ -150,14 +149,14 @@ with the existing note/LED release.
 
 ### Live held-chord transaction
 
-There is no hold-mode state, handler, or generated parameter. Every actual rank-8
-quality and extension state change retargets sounding owners. Live scale, Base Octave,
+There is no hold-mode state, handler, or generated parameter. Every actual rank-7/8 quality
+and rank-8 extension state change retargets sounding owners. Live scale, Base Octave,
 Voice, Nearest, and bass changes do not retarget a sounding owner.
 
-Every press snapshot retains the automatic root-position triad and quality plus its
+Every press snapshot retains the automatic root-position triad, quality, and unvoiced scale seventh plus its
 manual voicing, exact Nearest adjustment, bass choice, and physical strike velocity.
 Rebuilding selects the stored automatic triad or the current fixed quality,
-adds the current 6/m7/M7/9 mask, reapplies the stored placement and bass, then submits
+adds the current 6/7/9 mask, reapplies the stored placement and bass, then submits
 all active owners to `active-notes.js` together.
 
 The active-note manager validates every replacement before mutation, computes the
@@ -189,9 +188,9 @@ and clears the global lease. Only then can the new winner claim the lease, grab 
 matrix, and repaint one complete frame. Standby instances show `duplicate standby`,
 receive no gated matrix events, and emit no grid-generated MIDI or LED commands.
 
-The reviewed WP5 Set is a binary release input at
-`release/PushChordGrid-v0.5.2-RC Project/PushChordGrid-v0.5.2-RC.als`. It contains one
-source chain—Push Chord Grid, MIDI Monitor, then Live's Arpeggiator—and one armed,
+The v0.6.0 Set, saved and reopened in Live 12.4.7, is a binary release input at
+`release/PushChordGrid-v0.6.0-RC Project/PushChordGrid-v0.6.0-RC.als`. It contains one
+source chain—Push Chord Grid, MIDI Monitor, then a bypassed Arpeggiator—and one armed,
 Monitor-In Drift destination fed from the source's Post FX MIDI. The manifest hashes
 both AMXD and Set. Deterministic packaging copies their
 exact bytes with fixed ZIP metadata, enforces a closed inventory, and writes AMXD/ZIP
@@ -216,13 +215,14 @@ focus loss / disable / delete / Set close ───┘
 `harmony.js` treats `scale_intervals` as root-relative, strictly increasing values
 whose first degree is `0`, matching the Live Object Model. Auto chords stack scale
 degrees 1/3/5, deriving major, minor, diminished, and modal qualities directly from
-Live. Momentary manual types use fixed Dim/Min/Maj/Sus intervals; independent
-extensions add +9/+10/+11/+14 semitones for 6/m7/M7/9. Voicing repeatedly raises the
+Live. Momentary manual types use eight fixed formulas; 6 and 9 add +9 and +14.
+Contextual 7 uses the stored scale seventh in Auto, +11 for Major/Augmented,
++9 for Dim, and +10 for all other manual qualities. Voicing repeatedly raises the
 lowest or lowers the highest chord tone by an octave. Optional bass follows the chord
 root through a separate octave state. H is tonic +12. Ranks 1–4 add 0/12/24/36
 semitones to the Base Octave, whose Live label convention makes C3 MIDI 60.
 
-When D7 Nearest mode is on, `harmony.js` scores the manual-voicing baseline plus every
+When D6 Nearest mode is on, `harmony.js` scores the manual-voicing baseline plus every
 MIDI-safe inversion within one chord rotation against the prior chord-tone snapshot.
 The symmetric score sums each side's distance to its closest opposing tone; ties keep
 the smallest absolute adjustment and then the lower signed adjustment. Bass is added
@@ -242,3 +242,16 @@ owner transition from zero to one and released on the last transition from one t
 A repeated press from the same owner releases its old snapshot before taking the new
 one. All loss-of-ownership lifecycle events emit the exact remaining note-offs in
 ascending pitch order, then CC123 All Notes Off, and clear all ownership state.
+
+### Shared Playing catalog
+
+The ES5 runtime derives supported automatic seventh intervals from all 2,048 accepted
+scale subsets and degree roots, including clipped automatic triads, then adds fixed
+manual identities. It emits unique labels in root, quality, seventh-interval, mask
+order, with `--` at zero. The label-to-code map is built once during initialization.
+`tools/runtime_metadata.py` runs this same catalog using development Node for the
+Python generator and validator. Node is never embedded or called by the artifact.
+Quality suffixes are Major empty, Minor m, Dim dim, Sus sus, Augmented aug, Power 5,
+Quartal quart, Dominant 7, and unresolved Auto auto. Active contextual 7 is labeled
+d7/m7/M7 for +9/+10/+11 and `7(+N)` otherwise, even when MIDI-range filtering omits
+that unvoiced candidate. Last feedback always lists the actual emitted notes.

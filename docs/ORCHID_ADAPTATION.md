@@ -1,7 +1,7 @@
 # Orchid capability study and Push adaptation
 
 Research date: 2026-08-17  
-Implemented slice: Push Chord Grid v0.5.2 RC
+Implemented slice: Push Chord Grid v0.6.0 RC
 
 ## Source record
 
@@ -52,12 +52,12 @@ copying Orchid's enclosure, synth presets, or menu structure.
 
 ## Capability disposition
 
-| Orchid capability | Push/Live adaptation | v0.4.3 disposition |
+| Orchid capability | Push/Live adaptation | Current disposition |
 | --- | --- | --- |
 | Key Mode | All 32 musical pads derive degrees 1–8 from Live's current root and scale | Implemented |
-| Manual Dim/Min/Maj/Sus | Momentary quality overrides on A8–D8; release returns to Auto | Implemented |
-| 6/m7/M7/9 extensions | Independent momentary modifiers on E8–H8; combinations are additive | Implemented |
-| Chord voicing dial | A7/B7/C7 move down/reset/up; D7 toggles deterministic Nearest mode | Implemented |
+| Manual qualities | Major/Minor/Dim/Sus on A8–D8 and Augmented/Power/Quartal/Dominant on A7–D7; last-held wins | Implemented |
+| Extensions | 6/7/9 on E8/F8/H8; contextual 7 follows Auto scale or manual quality; G8 reserved | Implemented |
+| Chord voicing dial | A6/B6/C6 move down/reset/up; D6 toggles deterministic Nearest mode | Implemented |
 | Chord feedback | Device face names the chord, quality/extensions, inversion, and exact MIDI snapshot | Implemented |
 | Bass engine and voicing | H7 adds a root bass voice; E7/F7/G7 move down/reset/up by octave | Implemented as MIDI; sound comes from Live |
 | Simple playstyle | Chord pitch snapshot is fixed at note-on and modifiers affect future chords | Superseded and removed in 0.5.2 |
@@ -70,7 +70,7 @@ copying Orchid's enclosure, synth presets, or menu structure.
 | BPM | Live Set tempo is the single clock | Live-native |
 | Loop record/overdub/undo/save | Session clip recording, overdub, Capture MIDI, duplicate/save Set | Live-native |
 | Separate performance/bass/raw MIDI | Multi-channel or multi-track routing design | Candidate follow-up |
-| Secret Chords | Additional quality bank without changing automatic Key Mode | Candidate follow-up |
+| Secret Chords | Augmented, Power, Quartal, Dominant on A7–D7 | Implemented in 0.6.0 |
 | Single-note/split keyboard | Conflicts with the requested four full chord rows | Intentionally excluded |
 
 All 32 chord pads are velocity-sensitive. Version 0.4.4 correlates the raw physical
@@ -86,7 +86,7 @@ their timing layer independently of the harmony engine.
 
 ## Implemented v0.4.6 follow-up
 
-D7 now toggles Nearest mode. The first chord establishes history; each later press
+D7 originally toggled Nearest mode; version 0.6.0 moves it to D6. The first chord establishes history; each later press
 chooses the lowest-scoring inversion within one rotation of that pad's row and manual
 Voice baseline. Scoring is symmetric across every prior and candidate chord tone,
 bass is excluded, and ties prefer the smallest adjustment then the lower signed step.
@@ -114,25 +114,23 @@ copied; other controls stay future-trigger-only.
 The user approved this remaining proposal set as product direction. It is intentionally
 harmonic rather than rhythmic and remains unimplemented until separately requested:
 
-1. Use a deliberate layer of reserved pads for Secret Chords such as augmented,
-   power, quartal, minor-major, and dominant colors.
-2. Explore recallable performance snapshots for voicing, bass register, and extension
+1. Explore recallable performance snapshots for voicing, bass register, and extension
    state.
-3. Explore Standalone-compatible separation of bass and chord MIDI paths.
+2. Explore Standalone-compatible separation of bass and chord MIDI paths.
 
 Possible pad placements are design notes, not assigned coordinate roles. Reserved pads
 remain silent until a proposal is accepted, implemented, documented, and covered by
 the full automated and hardware gates.
 
-## Exact v0.5.0 grid
+## Exact v0.6.0 grid
 
 Push coordinates use chess notation: A1 is bottom-left and H8 is top-right.
 
 | Rank | A | B | C | D | E | F | G | H |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 8 | Dim | Min | Maj | Sus | 6 | m7 | M7 | 9 |
-| 7 | Voice − | Voice 0 | Voice + | Nearest | Bass − | Bass −1 | Bass + | Bass on/off |
-| 6 | Reserved | Reserved | Reserved | Reserved | Reserved | Reserved | Reserved | Reserved |
+| 8 | Major | Minor | Dim | Sus | 6 | 7 | Reserved | 9 |
+| 7 | Augmented | Power | Quartal | Dominant | Bass − | Bass −1 | Bass + | Bass on/off |
+| 6 | Voice − | Voice 0 | Voice + | Nearest | Reserved | Reserved | Reserved | Reserved |
 | 5 | Reserved | Reserved | Reserved | Reserved | Reserved | Reserved | Reserved | Reserved |
 | 4 | Degree 1 +36 | 2 +36 | 3 +36 | 4 +36 | 5 +36 | 6 +36 | 7 +36 | 8 +36 |
 | 3 | Degree 1 +24 | 2 +24 | 3 +24 | 4 +24 | 5 +24 | 6 +24 | 7 +24 | 8 +24 |
@@ -159,10 +157,16 @@ Manual quality intervals from the chord root are:
 | Min | `0 3 7` |
 | Maj | `0 4 7` |
 | Sus | `0 5 7` |
+| Augmented | `0 4 8` |
+| Power | `0 7` |
+| Quartal | `0 5 10` |
+| Dominant | `0 4 7 10` |
 
-Extensions independently add `+9` (6), `+10` (m7), `+11` (M7), and `+14` (9).
-They do not silently imply one another. For C major, holding all four produces
-`60 64 67 69 70 71 74`.
+6 and 9 add `+9` and `+14`. Contextual 7 uses the press-time scale-stacked seventh
+in Auto, `+11` for Major/Augmented, `+9` for Dim, and `+10` for other manual qualities.
+Quartal/Dominant already contain +10, so 7 is idempotent. C Major with all three
+extensions is `60 64 67 69 71 74`; C Minor is `60 63 67 69 70 74`.
+Power is a dyad: Voice + produces `67 72` from `60 67`.
 
 Positive chord voicing removes the current lowest chord tone and places it 12
 semitones higher; negative voicing does the inverse to the highest tone. Extension
@@ -172,8 +176,8 @@ root and follows its own octave state.
 ## Safety and compatibility
 
 - Controls and reserved pads emit no note-on.
-- A sounding chord owns its exact pitch snapshot even after modifiers, scale, voicing,
-  bass, or octave state changes.
+- Quality/extension edges atomically replace all sounding snapshots; scale, Voice,
+  Nearest, bass, and octave changes affect future presses only.
 - Shared pitches use reference counts and are released only by the final owner.
 - Focus loss, disable, deletion, and Set close flush exact note-offs plus CC123.
 - Momentary modifiers clear on lifecycle loss; persistent voicing and bass selections

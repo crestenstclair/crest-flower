@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Generate the self-contained Push Chord Grid v0.5.2 Max for Live MIDI Effect."""
+"""Generate the self-contained Push Chord Grid v0.6.0 Max for Live MIDI Effect."""
 
 from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
 from m4l_builder import MidiEffect, Subpatcher
@@ -18,6 +19,8 @@ DEVICE_NAME = "Push Chord Grid"
 DEFAULT_OUTPUT = Path("dist/PushChordGrid.amxd")
 REPRODUCIBLE_TIMESTAMP = 946684800
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 RUNTIME_FILES = (
     "active-notes.js",
     "harmony.js",
@@ -26,30 +29,7 @@ RUNTIME_FILES = (
     "runtime-adapter.js",
     "state.js",
 )
-DISPLAY_NOTE_NAMES = (
-    "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
-)
-DISPLAY_QUALITY_SUFFIXES = ("", "m", "dim", "sus", "auto")
-DISPLAY_EXTENSION_LABELS = ("6", "m7", "M7", "9")
-
-
-def playing_display_labels() -> list[str]:
-    """Return the complete deterministic enum table used by Push's Playing display."""
-    labels = ["--"]
-    for root in DISPLAY_NOTE_NAMES:
-        for quality_suffix in DISPLAY_QUALITY_SUFFIXES:
-            for mask in range(16):
-                extensions = [
-                    label
-                    for index, label in enumerate(DISPLAY_EXTENSION_LABELS)
-                    if mask & (1 << index)
-                ]
-                labels.append(
-                    root
-                    + quality_suffix
-                    + (f" +{'+'.join(extensions)}" if extensions else "")
-                )
-    return labels
+from tools.runtime_metadata import playing_display_labels  # noqa: E402
 
 
 def _runtime_source(filename: str) -> Path:
@@ -229,7 +209,7 @@ def create_device() -> MidiEffect:
                         "parameter_shortname": "Playing",
                         "parameter_type": 2,
                         "parameter_mmin": 0,
-                        "parameter_mmax": 960,
+                        "parameter_mmax": len(playing_display_labels()) - 1,
                         "parameter_initial_enable": 1,
                         "parameter_initial": [0],
                         "parameter_unitstyle": 9,

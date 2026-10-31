@@ -63,7 +63,7 @@ voicing changes, Live scale changes, Base Octave changes, or any lifecycle flush
 occurs. Clearing history SHALL NOT alter the pitch snapshot owned by a currently held
 chord except when a lifecycle flush releases all owners.
 
-#### Scenario: Relocated manual voicing change establishes a new baseline
+#### Scenario: Manual voicing change establishes a new baseline
 - **WHEN** a held chord exists and A6, B6, or C6 changes manual voicing
 - **THEN** the held owner remains unchanged, history clears, and the next chord uses
   the new manual baseline unchanged

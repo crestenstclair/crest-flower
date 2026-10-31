@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.6.0 — 2026-10-29
+
+- **Breaking:** A8–D8 are Major/Minor/Dim/Sus; A7–D7 are Augmented/Power/Quartal/Dominant.
+- **Breaking:** Voice −/0/+ and Nearest move to A6–D6. G8 is now reserved.
+- Replace m7/M7 controls with contextual 7 on F8; preserve 6 and 9 on E8/H8.
+- Store the automatic scale seventh in each press recipe; retain atomic holds,
+  physical velocity, shared-pitch ownership, bass, and exact Nearest placement.
+- Add exact quality, seventh, overlap, boundary, feedback, LED, lifecycle, and stress
+  vectors; keep 100% deterministic-core coverage and six embedded runtime files.
+- Generate 3,121 unique Playing labels from the runtime identity catalog.
+- Update the grid guide and acceptance card; new physical checks remain explicit.
+
 ## 0.5.2 — 2026-08-18
 
 - Remove the legacy immutable hold path and expose no Hold Mode setting.

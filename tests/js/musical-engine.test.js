@@ -55,7 +55,7 @@ test("C major, A natural minor, and D Dorian auto-harmonize all four rows", () =
                 `${vector.name} row ${row}`
             );
         }
-        ["sixth", "minor_seventh", "major_seventh", "ninth"].forEach((extension) => {
+        ["sixth", "seventh", "ninth"].forEach((extension) => {
             musicalState.setExtension(state, extension, true);
         });
         assert.deepEqual(
@@ -75,7 +75,7 @@ test("degree 8 is tonic plus an octave even for a non-heptatonic scale", () => {
     );
 });
 
-test("Orchid chord types and four independent extensions use exact intervals", () => {
+test("Orchid chord types and three contextual extensions use exact intervals", () => {
     assert.deepEqual(harmony.qualityChordPitches(60, "diminished"), [60, 63, 66]);
     assert.deepEqual(harmony.qualityChordPitches(60, "minor"), [60, 63, 67]);
     assert.deepEqual(harmony.qualityChordPitches(60, "major"), [60, 64, 67]);
@@ -83,19 +83,17 @@ test("Orchid chord types and four independent extensions use exact intervals", (
     assert.deepEqual(
         harmony.addExtensions([60, 64, 67], 60, {
             sixth: true,
-            minor_seventh: true,
-            major_seventh: true,
+            seventh: true,
             ninth: true
-        }),
-        [60, 64, 67, 69, 70, 71, 74]
+        }, 71),
+        [60, 64, 67, 69, 71, 74]
     );
     assert.deepEqual(
         harmony.addExtensions([120, 124, 127], 120, {
             sixth: true,
-            minor_seventh: true,
-            major_seventh: true,
+            seventh: true,
             ninth: true
-        }),
+        }, 131),
         [120, 124, 127]
     );
 });
@@ -154,8 +152,7 @@ test("state controls affect future chords and lifecycle reset preserves persiste
         chordType: "auto",
         extensions: {
             sixth: false,
-            minor_seventh: false,
-            major_seventh: false,
+            seventh: false,
             ninth: false
         },
         voicing: 0,
@@ -183,8 +180,7 @@ test("state controls affect future chords and lifecycle reset preserves persiste
     assert.equal(state.chordType, "auto");
     assert.deepEqual(state.extensions, {
         sixth: false,
-        minor_seventh: false,
-        major_seventh: false,
+        seventh: false,
         ninth: false
     });
     assert.equal(state.voicing, 1);
@@ -213,6 +209,7 @@ test("nearest voice leading is opt-in, stateful, and publishes exact chord snaps
         resolvedQuality: "major",
         automaticQuality: "major",
         automaticChordPitches: [60, 64, 67],
+        automaticSeventhPitch: 71, seventhPitch: null, seventhInterval: null,
         extensions: [],
         manualVoicing: 0,
         voiceLeadingEnabled: true,
@@ -298,8 +295,7 @@ test("held chord snapshots retarget from immutable press context", () => {
     musicalState.updateScale(state, 0, [0, 2, 4, 5, 7, 9, 11]);
     const extensions = {
         sixth: false,
-        minor_seventh: false,
-        major_seventh: false,
+        seventh: false,
         ninth: true
     };
     const majorNinth = musicalState.retargetChordSnapshot(snapshot, "major", extensions);
@@ -309,6 +305,7 @@ test("held chord snapshots retarget from immutable press context", () => {
         resolvedQuality: "major",
         automaticQuality: "minor",
         automaticChordPitches: [69, 72, 76],
+        automaticSeventhPitch: 79, seventhPitch: null, seventhInterval: null,
         extensions: ["ninth"],
         manualVoicing: 1,
         voiceLeadingEnabled: false,
@@ -322,7 +319,7 @@ test("held chord snapshots retarget from immutable press context", () => {
     const automatic = musicalState.retargetChordSnapshot(
         majorNinth,
         "auto",
-        {sixth: false, minor_seventh: false, major_seventh: false, ninth: false}
+        {sixth: false, seventh: false, ninth: false}
     );
     assert.equal(automatic.resolvedQuality, "minor");
     assert.deepEqual(automatic.chordPitches, [72, 76, 81]);
@@ -337,8 +334,7 @@ test("retargeting reapplies the exact press-time nearest adjustment", () => {
     assert.equal(snapshot.nearestAdjustment, -1);
     const retargeted = musicalState.retargetChordSnapshot(snapshot, "minor", {
         sixth: false,
-        minor_seventh: true,
-        major_seventh: false,
+        seventh: true,
         ninth: false
     });
     assert.equal(retargeted.nearestAdjustment, -1);
@@ -514,7 +510,7 @@ test("invalid musical inputs fail deterministically", () => {
     assert.throws(() => harmony.addBass([], 60, false, 2), /bass octave/);
 
     const state = musicalState.createState();
-    assert.throws(() => musicalState.setChordType(state, "power"), /chord type/);
+    assert.throws(() => musicalState.setChordType(state, "unknown"), /chord type/);
     assert.throws(() => musicalState.setExtension(state, "eleventh", true), /extension/);
     assert.throws(() => musicalState.setExtension(state, "ninth", 1), /boolean/);
     assert.throws(() => musicalState.setVoicing(state, -17), /voicing/);
@@ -527,7 +523,7 @@ test("invalid musical inputs fail deterministically", () => {
     assert.throws(() => musicalState.createState({scaleIntervals: null}), /scale intervals/);
     assert.throws(() => musicalState.retargetChordSnapshot(null, "auto", {}), /snapshot/);
     assert.throws(
-        () => musicalState.retargetChordSnapshot({}, "power", {}),
+        () => musicalState.retargetChordSnapshot({}, "unknown", {}),
         /chord type/
     );
     assert.throws(
@@ -571,7 +567,7 @@ test("out-of-range high notes return no MIDI pitch", () => {
             2,
             1,
             "auto",
-            {sixth: false, minor_seventh: false, major_seventh: false, ninth: false},
+            {sixth: false, seventh: false, ninth: false},
             0,
             false,
             -1
@@ -586,7 +582,7 @@ test("out-of-range high notes return no MIDI pitch", () => {
             1,
             8,
             "auto",
-            {sixth: false, minor_seventh: false, major_seventh: false, ninth: false},
+            {sixth: false, seventh: false, ninth: false},
             0,
             false,
             -1
@@ -601,7 +597,7 @@ test("out-of-range high notes return no MIDI pitch", () => {
             1,
             1,
             "minor",
-            {sixth: false, minor_seventh: false, major_seventh: false, ninth: false},
+            {sixth: false, seventh: false, ninth: false},
             0,
             false,
             -1
@@ -616,7 +612,7 @@ test("out-of-range high notes return no MIDI pitch", () => {
             1,
             1,
             "auto",
-            {sixth: false, minor_seventh: false, major_seventh: false, ninth: false},
+            {sixth: false, seventh: false, ninth: false},
             0,
             false,
             -1
@@ -631,7 +627,7 @@ test("out-of-range high notes return no MIDI pitch", () => {
             4,
             1,
             "auto",
-            {sixth: false, minor_seventh: false, major_seventh: false, ninth: false},
+            {sixth: false, seventh: false, ninth: false},
             0,
             false,
             -1

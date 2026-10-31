@@ -20,6 +20,16 @@ currently held chord. Retargeting SHALL preserve each owner's press-time root,
 automatic diatonic triad and scale-stacked seventh candidate, manual Voice, Nearest
 adjustment, bass choice, and physical strike velocity.
 
+#### Scenario: Quality is pressed and released over a held automatic chord
+- **WHEN** an automatic A-minor chord is held, Major is pressed, and Major is released
+- **THEN** the sounding owner changes to A major and then returns to its original
+  automatic A-minor triad without requiring the chord pad to be retriggered
+
+#### Scenario: Ninth is added to overlapping held chords
+- **WHEN** two chord pads with different strike velocities are held and 9 is pressed
+- **THEN** both sounding owner snapshots gain their press-root ninth and every newly
+  sounding note-on uses the corresponding retained physical velocity
+
 #### Scenario: Secret quality is pressed and released over a held automatic chord
 - **WHEN** an automatic A-minor chord is held, Augmented is pressed, and Augmented is
   released
@@ -56,7 +66,7 @@ feedback.
 - **THEN** Playing and Last show the newest held chord with the new quality,
   contextual seventh identity, extensions, and exact emitted pitch snapshot
 
-#### Scenario: Lifecycle loss follows a live change
+#### Scenario: Lifecycle loss follows an Advanced change
 - **WHEN** focus loss, disable, reload, deletion, Set close, panic, or lease transfer
   occurs after held owners were retargeted
 - **THEN** every remaining pitch emits one final note-off in ascending order, CC123 is

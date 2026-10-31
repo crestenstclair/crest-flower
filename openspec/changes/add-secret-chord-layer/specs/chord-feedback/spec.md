@@ -6,7 +6,7 @@ manual Voice value, Nearest on/off state, Bass state/register, and active 6/7/9
 modifiers. Control changes SHALL update this display without emitting direct musical
 MIDI.
 
-#### Scenario: Relocated Nearest control updates current state
+#### Scenario: Nearest control updates current state
 - **WHEN** D6 toggles Nearest mode
 - **THEN** the current-state display changes between `Nearest off` and `Nearest on`
   and all other current selections remain accurately represented
@@ -22,6 +22,11 @@ the harmonic root name, resolved basic/Secret quality, applied 6/7/9 extensions,
 resolved seventh identity, Nearest/manual inversion information, and every final
 emitted MIDI pitch as a note name plus number. Feedback SHALL be derived from the
 exact pitch snapshot supplied to active-note ownership.
+
+#### Scenario: Automatic diatonic chord is identified
+- **WHEN** a C-major degree-2 chord pad generates D minor
+- **THEN** feedback identifies root D, resolved Minor quality, the applied extension
+  set, inversion state, and exactly the emitted pitch snapshot
 
 #### Scenario: Automatic diatonic seventh is identified
 - **WHEN** contextual 7 is active and a C-major degree-5 chord generates G dominant-

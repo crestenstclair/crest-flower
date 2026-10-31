@@ -47,7 +47,7 @@ def test_usage_guide_is_complete_offline_and_coordinate_exact() -> None:
     assert "Shipped + roadmap" in source
     assert "Your strike shapes the whole chord" in source
     assert "Implemented · 0.4.6" in source
-    assert "v0.5.2" in source
+    assert "v0.6.0" in source
     assert "duplicate standby" in source
     assert "Reload Grid" in source
     assert "Scale C Minor | Chord: Auto | Voice 0 | Nearest on | Bass off | Ext 9" in source
@@ -71,18 +71,22 @@ def test_usage_guide_documents_current_control_roles() -> None:
     source = GUIDE.read_text(encoding="utf-8")
 
     for coordinate, role in {
-        "A8": "Dim",
+        "A8": "Major",
         "B8": "Minor",
-        "C8": "Major",
+        "C8": "Dim",
         "D8": "Suspended",
         "E8": "Add 6",
-        "F8": "Add minor 7",
-        "G8": "Add Major 7",
+        "F8": "Add contextual 7",
+        "G8": "Reserved",
         "H8": "Add 9",
-        "A7": "Voice down",
-        "B7": "Voice reset",
-        "C7": "Voice up",
-        "D7": "Nearest voice leading",
+        "A7": "Augmented",
+        "A6": "Voice down",
+        "B7": "Power",
+        "B6": "Voice reset",
+        "C7": "Quartal",
+        "C6": "Voice up",
+        "D7": "Dominant",
+        "D6": "Nearest voice leading",
         "E7": "Bass down",
         "F7": "Bass reset",
         "G7": "Bass up",
@@ -91,5 +95,5 @@ def test_usage_guide_documents_current_control_roles() -> None:
         assert f'data-coordinate="{coordinate}" data-role="{role}"' in source
 
     assert source.count('data-kind="chord"') == 32
-    assert source.count('data-kind="reserved"') == 16
+    assert source.count('data-kind="reserved"') == 13
     assert source.count('data-kind="voiceleading"') == 1

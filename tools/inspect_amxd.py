@@ -31,30 +31,7 @@ AMXD_MAGIC = b"ampf"
 AMXD_VERSION = 4
 MIDI_EFFECT_CODE = b"mmmm"
 MIDI_EFFECT_PROJECT_TYPE = 1835887981
-DISPLAY_NOTE_NAMES = (
-    "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
-)
-DISPLAY_QUALITY_SUFFIXES = ("", "m", "dim", "sus", "auto")
-DISPLAY_EXTENSION_LABELS = ("6", "m7", "M7", "9")
-
-
-def expected_playing_display_labels() -> list[str]:
-    """Generate the required Playing enum independently from the device builder."""
-    labels = ["--"]
-    for root in DISPLAY_NOTE_NAMES:
-        for quality_suffix in DISPLAY_QUALITY_SUFFIXES:
-            for mask in range(16):
-                extensions = [
-                    label
-                    for index, label in enumerate(DISPLAY_EXTENSION_LABELS)
-                    if mask & (1 << index)
-                ]
-                labels.append(
-                    root
-                    + quality_suffix
-                    + (f" +{'+'.join(extensions)}" if extensions else "")
-                )
-    return labels
+from tools.runtime_metadata import playing_display_labels as expected_playing_display_labels  # noqa: E402
 
 
 class AmxdValidationError(ValueError):
@@ -399,9 +376,9 @@ def validate_document(document: AmxdDocument) -> list[str]:
             errors.append("Playing initial value is not blank")
         if (
             playing_valueof.get("parameter_mmin") != 0
-            or playing_valueof.get("parameter_mmax") != 960
+            or playing_valueof.get("parameter_mmax") != len(expected_playing_display_labels()) - 1
         ):
-            errors.append("Playing range is not 0..960")
+            errors.append("Playing range does not match the runtime catalog")
         if playing_valueof.get("parameter_enum") != expected_playing_display_labels():
             errors.append("Playing enum labels do not match the deterministic chord table")
 

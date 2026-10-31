@@ -5,14 +5,13 @@
 var stateHarmony = typeof module !== "undefined" && module.exports ?
     require("./harmony.js") : harmony;
 var DEFAULT_SCALE_INTERVALS = [0, 2, 4, 5, 7, 9, 11];
-var CHORD_TYPES = ["auto", "diminished", "minor", "major", "suspended"];
-var EXTENSIONS = ["sixth", "minor_seventh", "major_seventh", "ninth"];
+var CHORD_TYPES = ["auto"].concat(stateHarmony.CHORD_TYPES);
+var EXTENSIONS = stateHarmony.EXTENSION_ORDER;
 
 function emptyExtensions() {
     return {
         sixth: false,
-        minor_seventh: false,
-        major_seventh: false,
+        seventh: false,
         ninth: false
     };
 }
@@ -170,10 +169,14 @@ function retargetChordSnapshot(snapshot, chordType, extensions) {
         snapshot.automaticChordPitches.slice() :
         stateHarmony.qualityChordPitches(snapshot.rootPitch, chordType);
     var quality = chordType === "auto" ? snapshot.automaticQuality : chordType;
+    var seventhPitch = normalizedExtensions.seventh ? stateHarmony.contextualSeventhPitch(
+        snapshot.rootPitch, chordType, snapshot.automaticSeventhPitch
+    ) : null;
     var chordPitches = stateHarmony.addExtensions(
         triad,
         snapshot.rootPitch,
-        normalizedExtensions
+        normalizedExtensions,
+        seventhPitch
     );
     chordPitches = stateHarmony.applyVoicing(chordPitches, snapshot.manualVoicing);
     if (snapshot.voiceLeadingEnabled) {
@@ -188,6 +191,9 @@ function retargetChordSnapshot(snapshot, chordType, extensions) {
         resolvedQuality: quality,
         automaticQuality: snapshot.automaticQuality,
         automaticChordPitches: snapshot.automaticChordPitches.slice(),
+        automaticSeventhPitch: snapshot.automaticSeventhPitch,
+        seventhPitch: seventhPitch,
+        seventhInterval: seventhPitch === null ? null : seventhPitch - snapshot.rootPitch,
         extensions: EXTENSIONS.filter(function (extension) {
             return normalizedExtensions[extension];
         }),
@@ -227,7 +233,13 @@ function chordSnapshotForPad(state, row, degree) {
     );
     var triad = state.chordType === "auto" ?
         automaticTriad : stateHarmony.qualityChordPitches(rootPitch, state.chordType);
-    var chordPitches = stateHarmony.addExtensions(triad, rootPitch, state.extensions);
+    var automaticSeventhPitch = stateHarmony.diatonicSeventhPitch(
+        state.rootNote, state.scaleIntervals, state.baseOctave, row, degree
+    );
+    var seventhPitch = state.extensions.seventh ? stateHarmony.contextualSeventhPitch(
+        rootPitch, state.chordType, automaticSeventhPitch
+    ) : null;
+    var chordPitches = stateHarmony.addExtensions(triad, rootPitch, state.extensions, seventhPitch);
     chordPitches = stateHarmony.applyVoicing(chordPitches, state.voicing);
     var nearest = {pitches: chordPitches, adjustment: 0, score: 0};
     if (state.voiceLeadingEnabled && state.voiceLeadingPitches.length > 0) {
@@ -243,6 +255,9 @@ function chordSnapshotForPad(state, row, degree) {
         resolvedQuality: resolvedQuality(rootPitch, triad, state.chordType),
         automaticQuality: resolvedQuality(rootPitch, automaticTriad, "auto"),
         automaticChordPitches: automaticTriad.slice(),
+        automaticSeventhPitch: automaticSeventhPitch,
+        seventhPitch: seventhPitch,
+        seventhInterval: seventhPitch === null ? null : seventhPitch - rootPitch,
         extensions: EXTENSIONS.filter(function (extension) {
             return state.extensions[extension];
         }),

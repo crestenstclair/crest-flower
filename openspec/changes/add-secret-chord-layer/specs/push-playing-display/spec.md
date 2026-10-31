@@ -8,6 +8,10 @@ modifier, and the contextual seventh's resolved diminished/minor/major identity 
 7 is enabled. The enum label catalog and runtime codes SHALL be generated in one
 stable, deduplicated order with `--` at code 0.
 
+#### Scenario: Extended minor chord is held
+- **WHEN** a chord press resolves to C minor with contextual 7 and 9 enabled
+- **THEN** the Push `Playing` value is `Cm +m7+9`
+
 #### Scenario: Contextually extended Major and Minor chords are held
 - **WHEN** C Major with 7 and 9 is the newest owner and is then replaced by C Minor
   with 7 and 9
@@ -30,7 +34,7 @@ relabel an already sounding owner.
 
 #### Scenario: Newest overlapping hold is released
 - **WHEN** C minor is held, D-sharp major is pressed, and D-sharp major is released
-- **THEN** the display changes from `Cm` to `D#` while the original C minor notes
+- **THEN** the display changes `Cm` → `D#` → `Cm` while the original C minor notes
   remain held
 
 #### Scenario: Live modifier retargets the display owner
@@ -38,7 +42,7 @@ relabel an already sounding owner.
 - **THEN** the display changes `Cm` → `Caug` → `Cm` with the committed held-owner
   transactions
 
-#### Scenario: Future-trigger-only controls change during a hold
+#### Scenario: Controls change during a hold
 - **WHEN** Live scale, Base Octave, Voice, Nearest, or bass changes while a chord is
   held
 - **THEN** the displayed owner identity remains its exact committed snapshot

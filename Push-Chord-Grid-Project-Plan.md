@@ -49,6 +49,11 @@ chord while preserving press-time root/voicing/bass context and strike velocity.
 There is no Hold Mode setting. Retained and shared pitches never retrigger; all other
 state changes remain future-trigger-only.
 
+Secret Chord follow-up (2026-10-29): v0.6.0 implements eight momentary qualities,
+contextual 7, and Voice/Nearest on A6–D6. The current grid and formulas below supersede
+historical control coordinates in the earlier work-package notes. New physical
+acceptance remains separate from automated proof; WP6 is deferred.
+
 ## 1. Intent
 
 This project is to be built by an LLM coding agent. The user defines the musical behavior and performs unavoidable tests on the physical Push. The agent owns the rest:
@@ -124,9 +129,9 @@ Build a Max for Live MIDI Effect that turns Push 3's 8×8 pad matrix into a spli
 - Ranks 5–8: controls.
 - Ranks 1–4 each trigger chords by scale degree, one octave per row.
 - Chord quality is derived automatically from Live's active root and scale.
-- Rank 8 provides momentary Dim/Min/Maj/Sus overrides plus independent
-  6/m7/M7/9 extensions.
-- Rank 7 provides persistent chord-voicing and bass-register controls.
+- Rank 8 provides Major/Minor/Dim/Sus and 6/7/Reserved/9.
+- Rank 7 provides Augmented/Power/Quartal/Dominant and unchanged bass controls.
+- A6–D6 provide Voice −/0/+ and Nearest; E6–H6 and rank 5 remain reserved.
 - The device produces MIDI and sits before any Ableton instrument.
 - It works on Push 3 Standalone after a one-time transfer.
 - During ordinary use it requires no computer, User Mode, MIDI mapping, Remote Script, helper application, or setup dialog.
@@ -147,13 +152,15 @@ Coordinates use chess notation:
 
 | Pads | Function | v0 behavior |
 | --- | --- | --- |
-| A8–D8 | Dim/Min/Maj/Sus | Momentary manual quality override; no direct trigger |
-| E8–H8 | 6/m7/M7/9 | Independent momentary extension; no direct trigger |
-| A7–C7 | Chord voicing | Down/reset/up one inversion step; no direct trigger |
-| D7 | Reserved | No output |
+| A8–D8 | Major/Minor/Dim/Sus | Momentary manual quality override; no direct trigger |
+| E8/F8/H8 | 6/contextual 7/9 | Momentary extensions; no direct trigger |
+| G8 | Reserved | No output |
+| A7–D7 | Augmented/Power/Quartal/Dominant | Same momentary quality stack |
+| A6–C6 | Chord voicing | Down/reset/up one inversion step; no direct trigger |
+| D6 | Nearest | Persistent toggle; no direct trigger |
 | E7–G7 | Bass register | Down/reset-to-−1/up one octave; no direct trigger |
 | H7 | Bass | Toggle root bass voice; no direct trigger |
-| A5–H6 | Reserved controls | No output |
+| A5–H5, E6–H6 | Reserved controls | No output |
 | A1–H1 | Chords, octave 1 | Degrees 1–8 from Base Octave |
 | A2–H2 | Chords, octave 2 | Same degrees, +12 semitones |
 | A3–H3 | Chords, octave 3 | Same degrees, +24 semitones |
@@ -166,14 +173,16 @@ Interaction defaults:
 - Voicing defaults to root position. Bass defaults off at one octave below the root.
 - All 32 chord pads are velocity-sensitive.
 - Multiple degree pads may be held simultaneously.
-- A held chord retains the exact voices created on note-on. Live scale changes affect
-  the next chord.
+- Quality and extension edges atomically retarget holds using press-time context.
+  Live scale, Base Octave, Voice, Nearest, and bass changes affect the next chord.
 - Active outputs are tracked per physical pad. Shared pitches are reference-counted to prevent stuck or prematurely terminated notes.
 - Control and reserved pads never leak trigger notes to the downstream instrument.
 
 Automatic triads stack scale degrees 1/3/5 from each pad's root. Manual chord types use
-0/3/6 (Dim), 0/3/7 (Min), 0/4/7 (Maj), and 0/5/7 (Sus). Extensions independently add
-root-relative +9 (6), +10 (m7), +11 (M7), and +14 (9) without implying one another.
+0/4/7 (Major), 0/3/7 (Minor), 0/3/6 (Dim), 0/5/7 (Sus), 0/4/8 (Augmented),
+0/7 (Power), 0/5/10 (Quartal), and 0/4/7/10 (Dominant). Extensions add +9 (6),
++14 (9), and one contextual seventh: stored scale-degree offset 6 in Auto, +11 for
+Major/Augmented, +9 for Dim, +10 otherwise. Quartal/Dominant +7 deduplicate.
 
 ## 5. Key, scale, and pitch behavior
 

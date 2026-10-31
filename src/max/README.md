@@ -17,7 +17,9 @@ root/interval snapshots.
 `runtime-adapter.js` assigns every coordinate one role, implements Orchid-style
 momentary qualities/extensions plus persistent voicing/bass controls, consumes every
 control/reserved pad, and connects musical pads to the WP3 snapshot/reference-count
-engine. D7 is an edge-safe Nearest toggle, and the adapter formats current settings
+engine. A8–D8 and A7–D7 form one eight-quality momentary stack; E8/F8/H8
+provide 6/contextual 7/9 and G8 is reserved. Voice moves to A6–C6. D6 is an
+edge-safe Nearest toggle, and the adapter formats current settings
 plus the exact last generated chord snapshot on separate device-face lines. Quality
 and extension edges always retarget held owners as one atomic core transaction while
 preserving press context and velocity; no legacy hold mode is exposed. Its note

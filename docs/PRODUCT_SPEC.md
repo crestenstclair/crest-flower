@@ -5,17 +5,17 @@ The complete product contract is maintained in
 records the currently implemented slice so future work cannot accidentally cross the
 hardware gate.
 
-## Current slice: WP5 v0.5.2 release candidate
+## Current slice: WP5 v0.6.0 release candidate
 
 The proven matrix adapter and pure musical engine are now integrated. The generated
 device provides:
 
 - four octave-spaced chord rows, each mapping A–H to degrees 1–8;
 - automatic chord quality from the active Live root and scale;
-- momentary Dim/Min/Maj/Sus quality overrides;
-- independent momentary 6/m7/M7/9 extensions;
+- momentary Major/Minor/Dim/Sus (A8–D8) and Augmented/Power/Quartal/Dominant (A7–D7) overrides;
+- momentary 6/7/9 extensions on E8/F8/H8, with contextual seventh and G8 reserved;
 - persistent chord voicing and optional root bass with an independent register;
-- persistent D7 Nearest mode with bass-independent deterministic inversion scoring;
+- persistent D6 Nearest mode with bass-independent deterministic inversion scoring;
 - exact last-chord identity, inversion, extension, and emitted-pitch feedback;
 - visible detected Live root/scale feedback on the current-state line;
 - a Push-native `Playing` value for the newest held exact chord snapshot;
@@ -62,7 +62,7 @@ The generated artifact is a Max for Live MIDI Effect with:
   for focus and Set reload;
 - physical matrix normalization where bottom-left is A1 and top-right is H8;
 - visible last-pad, lifecycle, current-selection, and last-chord status on the device face;
-- 16 silent harmonic/voicing/nearest/bass controls, 16 silent reserved pads, and 32 chord pads
+- 19 silent harmonic/voicing/nearest/bass controls, 13 silent reserved pads, and 32 chord pads
   with exactly one documented role per coordinate;
 - a complete LED repaint after acquisition, changed-pad updates during use, and an LED
   clear before matrix release; and
@@ -115,5 +115,21 @@ global pitch diffs and exposes no mode setting. The reviewed Set contains one Pu
 source followed by MIDI Monitor and Live's Arpeggiator, plus one armed Monitor-In
 Drift destination fed from Post FX. A deterministic
 30-minute-equivalent regression produces more than 10,000 exactly matched note events.
-Only the physical 30-minute Push performance observation remains pending. WP6
+For v0.5.2, only the physical 30-minute observation remained pending.
+The v0.6.0 RC has new Live and physical checks open; consult HARDWARE_TESTS.md. WP6
 Standalone transfer and acceptance have not begun.
+
+## Secret Chord layer (0.6.0)
+
+Voice −/0/+ move to A6–C6 and Nearest to D6. The two quality rows use one
+last-held-wins stack. Fixed formulas are Major 0/4/7, Minor 0/3/7, Dim 0/3/6,
+Sus 0/5/7, Augmented 0/4/8, Power 0/7, Quartal 0/5/10, Dominant 0/4/7/10.
+The contextual seventh is the stored scale-degree offset 6 in Auto; manually it is
++11 for Major/Augmented, +9 for Dim, +10 otherwise. 6 adds +9 and 9 adds +14.
+All additions deduplicate and filter MIDI range before voicing. Power remains a dyad;
+Dominant/Quartal +7 is idempotent. Held recipes preserve the automatic seventh even
+when 7 is off or the candidate is beyond MIDI range. Playing has 3,121 unique labels;
+unusual scale sevenths use `7(+N)` to preserve the exact semitone interval.
+
+Automated and artifact evidence is current; new physical acceptance is recorded
+separately in HARDWARE_TESTS.md and must not be inferred from prior releases.

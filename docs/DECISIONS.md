@@ -390,3 +390,34 @@
   emit exact note-offs plus CC123, with no hidden hold-style state retained.
 - **Delivery:** This follow-up is v0.5.2 RC and introduces no coordinate change,
   Remote Script, private Push API, runtime dependency, or WP6 Standalone gate.
+
+## 2026-10-29 — Secret Chord layer
+
+- **Authorization:** The user directed work to continue after the status report
+  identified `add-secret-chord-layer` as the next planned change.
+- **Release:** v0.6.0 RC signals the breaking pad map: A8–D8 Major/Minor/Dim/Sus,
+  A7–D7 Augmented/Power/Quartal/Dominant, A6–D6 Voice −/0/+/Nearest.
+  E8/F8/H8 are 6/7/9; G8 is reserved. Bass controls and chord rows are unchanged.
+- **Formulas:** Major 0/4/7; Minor 0/3/7; Dim 0/3/6; Sus 0/5/7;
+  Augmented 0/4/8; Power 0/7; Quartal 0/5/10; Dominant 0/4/7/10.
+- **Seventh:** Auto stores the scale-stacked seventh at press time, including a
+  candidate above MIDI range. Manual Major/Augmented use +11, Dim +9, others +10.
+  One `seventh` flag replaces both legacy flags. Quartal/Dominant +7 deduplicate.
+- **Ownership:** Reuse the existing atomic all-owner retarget transaction and
+  cardinality-based Nearest search. Press root, scale recipe, Voice, Nearest adjustment,
+  bass, and physical velocity survive modifier edges. Future-only controls stay so.
+- **Feedback:** A runtime-owned, deduplicated catalog supplies 3,121 Playing labels
+  and codes to runtime, generator, and validator. Nonstandard scale intervals use
+  `7(+N)`; Last prints exact emitted MIDI. Development Node extracts metadata; the
+  artifact still embeds only the same six ES5 files and no runtime dependencies.
+- **Gate:** Automated tests/build/static validation pass; current Live/physical
+  observations belong in HARDWARE_TESTS.md. Prior v0.5.2 evidence is not new
+  acceptance. WP6 Standalone remains deferred.
+- **Live evidence:** With authorization to discard the prior unsaved Set, Live
+  12.4.7 loaded, saved and reopened the v0.6.0 RC. Acquisition, disable/re-enable,
+  Reload Grid, duplicate standby and reorder/deletion ownership checks passed.
+  The clean saved Set uses C Major/Base Octave 3, a bypassed Arpeggiator and an
+  armed Monitor-In Drift destination. A temporary Post-FX recording preserved
+  60/64/67 at velocity 72; all probes were removed before saving. This verifies
+  passthrough/routing, not physical pad generation. Exact Secret Chord pad and LED
+  observations remain open.

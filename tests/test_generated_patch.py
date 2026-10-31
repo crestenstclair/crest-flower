@@ -104,10 +104,12 @@ def test_only_base_octave_and_playing_are_stored_and_banked(tmp_path: Path) -> N
     assert playing_valueof["parameter_type"] == 2
     assert playing_valueof["parameter_initial"] == [0]
     assert playing_valueof["parameter_mmin"] == 0
-    assert playing_valueof["parameter_mmax"] == 960
+    assert playing_valueof["parameter_mmax"] == len(playing_valueof["parameter_enum"]) - 1
     assert playing_valueof["parameter_enum"] == playing_display_labels()
-    assert len(playing_valueof["parameter_enum"]) == 961
-    assert playing_valueof["parameter_enum"][27] == "Cm +m7+9"
+    assert len(playing_valueof["parameter_enum"]) == len(playing_display_labels())
+    assert len(playing_valueof["parameter_enum"]) == 3121
+    assert "Cm +m7+9" in playing_valueof["parameter_enum"]
+    assert "Caug +M7" in playing_valueof["parameter_enum"]
     assert patcher["parameters"]["parameterbanks"]["0"]["parameters"] == [
         "Base Octave",
         "Playing",
@@ -283,9 +285,9 @@ def test_manifest_is_deterministic_and_matches_artifact(tmp_path: Path) -> None:
     manifest = json.loads(first_manifest.read_text(encoding="utf-8"))
     assert manifest["artifact"]["sha256"] == sha256(artifact)
     assert manifest["stage"] == "WP5"
-    assert manifest["version"] == "0.5.2"
+    assert manifest["version"] == "0.6.0"
     assert manifest["release_set"] == {
-        "path": "PushChordGrid-v0.5.2-RC.als",
+        "path": "PushChordGrid-v0.6.0-RC.als",
         "bytes": DEFAULT_LIVE_SET.stat().st_size,
         "sha256": sha256(DEFAULT_LIVE_SET),
     }
@@ -315,7 +317,8 @@ def test_reviewed_live_set_contains_playing_parameter() -> None:
     assert parameter.find("Index").get("Value") == "1"
     assert parameter.find("Type").get("Value") == "2"
     assert parameter.find("MinValue").get("Value") == "0"
-    assert parameter.find("MaxValue").get("Value") == "960"
+    assert parameter.find("MaxValue").get("Value") == str(len(playing_display_labels()) - 1)
+    assert [entry.get("Value") for entry in parameter.findall("Names/Name/Name")] == playing_display_labels()
     assert parameter.find("Default").get("Value") == "0"
     parameter_names = {
         item.find("Name").get("Value")
@@ -344,15 +347,42 @@ def test_release_package_is_reproducible_and_complete(tmp_path: Path) -> None:
     )
     with zipfile.ZipFile(first) as archive:
         assert archive.namelist() == [
-            "PushChordGrid-v0.5.2-RC/CHANGELOG.md",
-            "PushChordGrid-v0.5.2-RC/HARDWARE_TESTS.md",
-            "PushChordGrid-v0.5.2-RC/ORCHID_ADAPTATION.md",
-            "PushChordGrid-v0.5.2-RC/PushChordGrid-v0.5.2-RC.als",
-            "PushChordGrid-v0.5.2-RC/PushChordGrid.amxd",
-            "PushChordGrid-v0.5.2-RC/README.md",
-            "PushChordGrid-v0.5.2-RC/USAGE_GUIDE.html",
-            "PushChordGrid-v0.5.2-RC/manifest.json",
+            "PushChordGrid-v0.6.0-RC/CHANGELOG.md",
+            "PushChordGrid-v0.6.0-RC/HARDWARE_TESTS.md",
+            "PushChordGrid-v0.6.0-RC/ORCHID_ADAPTATION.md",
+            "PushChordGrid-v0.6.0-RC/PushChordGrid-v0.6.0-RC.als",
+            "PushChordGrid-v0.6.0-RC/PushChordGrid.amxd",
+            "PushChordGrid-v0.6.0-RC/README.md",
+            "PushChordGrid-v0.6.0-RC/USAGE_GUIDE.html",
+            "PushChordGrid-v0.6.0-RC/manifest.json",
         ]
-        assert archive.read("PushChordGrid-v0.5.2-RC/PushChordGrid-v0.5.2-RC.als") == (
+        assert archive.read("PushChordGrid-v0.6.0-RC/PushChordGrid-v0.6.0-RC.als") == (
             DEFAULT_LIVE_SET.read_bytes()
         )
+
+
+def test_release_rejects_stale_or_duplicate_playing_metadata(tmp_path: Path) -> None:
+    import pytest
+    from tools.inspect_amxd import AmxdValidationError
+    from tools.validate_release import validate_live_set
+
+    root = ET.fromstring(gzip.decompress(DEFAULT_LIVE_SET.read_bytes()))
+    parameter = next(item for item in root.findall(".//MxDEnumParameter")
+                     if item.find("Name").get("Value") == "Playing")
+    parameter.find("MaxValue").set("Value", "960")
+    stale = tmp_path / "stale.als"
+    stale.write_bytes(gzip.compress(ET.tostring(root), mtime=0))
+    with pytest.raises(AmxdValidationError, match="does not match"):
+        validate_live_set(stale)
+    parameter.find("MaxValue").set("Value", str(len(playing_display_labels()) - 1))
+    parameter.find("Names/Name/Name").set("Value", "stale label")
+    stale.write_bytes(gzip.compress(ET.tostring(root), mtime=0))
+    with pytest.raises(AmxdValidationError, match="does not match"):
+        validate_live_set(stale)
+    root.append(parameter)
+    stale.write_bytes(gzip.compress(ET.tostring(root), mtime=0))
+    with pytest.raises(AmxdValidationError, match="exactly one"):
+        validate_live_set(stale)
+    stale.write_bytes(b"invalid set")
+    with pytest.raises(AmxdValidationError, match="invalid release Set"):
+        validate_live_set(stale)

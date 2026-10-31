@@ -2,12 +2,12 @@
 
 ## Scope and gate
 
-WP0–WP4 are accepted. Version 0.4.1 added Push pad lighting, 0.4.2 changed ranks 1–4
-to four octave-spaced automatically diatonic chord rows, and the current authorized
-0.4.3 follow-up adapts Orchid's harmonic modifiers, chord voicing, and bass. Do not
-begin WP5 without a new implementation request. Repeated Push
-Standalone switching is explicitly deferred by user decision; preserve standalone
-compatibility without requiring a standalone test at each gate.
+WP0–WP4 are accepted. WP5 hardening and v0.5.2 live held-chord behavior are
+implemented; physical duration acceptance remains open. The user authorized
+continuing `add-secret-chord-layer` on 2026-10-29. Version 0.6.0 adds eight qualities,
+contextual 7, and relocated Voice/Nearest controls. Do not begin WP6 without a new
+implementation request. Repeated Push Standalone switching remains deferred;
+preserve compatibility without requiring a Standalone test at each gate.
 
 ## Source of truth
 

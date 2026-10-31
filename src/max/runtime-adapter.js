@@ -22,19 +22,22 @@ if (typeof outlet !== "undefined") {
 
 var FILES = "ABCDEFGH";
 var QUALITY_CONTROLS = {
-    A8: "diminished",
+    A8: "major",
     B8: "minor",
-    C8: "major",
-    D8: "suspended"
+    C8: "diminished",
+    D8: "suspended",
+    A7: "augmented",
+    B7: "power",
+    C7: "quartal",
+    D7: "dominant"
 };
 var EXTENSION_CONTROLS = {
     E8: "sixth",
-    F8: "minor_seventh",
-    G8: "major_seventh",
+    F8: "seventh",
     H8: "ninth"
 };
-var VOICING_CONTROLS = {A7: -1, B7: 0, C7: 1};
-var VOICE_LEADING_CONTROL = "D7";
+var VOICING_CONTROLS = {A6: -1, B6: 0, C6: 1};
+var VOICE_LEADING_CONTROL = "D6";
 var BASS_VOICING_CONTROLS = {E7: -1, F7: 0, G7: 1};
 var BASS_TOGGLE_CONTROL = "H7";
 var QUALITY_LABELS = {
@@ -42,16 +45,20 @@ var QUALITY_LABELS = {
     diminished: "Dim",
     minor: "Min",
     major: "Maj",
-    suspended: "Sus"
+    suspended: "Sus",
+    augmented: "Augmented",
+    power: "Power",
+    quartal: "Quartal",
+    dominant: "Dominant"
 };
 var EXTENSION_LABELS = {
     sixth: "6",
-    minor_seventh: "m7",
-    major_seventh: "M7",
+    seventh: "7",
     ninth: "9"
 };
-var DISPLAY_QUALITY_ORDER = ["major", "minor", "diminished", "suspended", "auto"];
-var DISPLAY_EXTENSION_ORDER = ["sixth", "minor_seventh", "major_seventh", "ninth"];
+var DISPLAY_QUALITY_ORDER = ["major", "minor", "diminished", "suspended",
+    "augmented", "power", "quartal", "dominant", "auto"];
+var DISPLAY_EXTENSION_ORDER = ["sixth", "seventh", "ninth"];
 var LED_COLORS = {
     off: 0,
     dimNeutral: 1,
@@ -454,19 +461,10 @@ function selectionText(runtime) {
 }
 
 var QUALITY_SUFFIXES = {
-    auto: "",
-    diminished: "dim",
-    minor: "m",
-    major: "",
-    suspended: "sus"
+    auto: "auto", diminished: "dim", minor: "m", major: "", suspended: "sus",
+    augmented: "aug", power: "5", quartal: "quart", dominant: "7"
 };
-var DISPLAY_QUALITY_SUFFIXES = {
-    auto: "auto",
-    diminished: "dim",
-    minor: "m",
-    major: "",
-    suspended: "sus"
-};
+var playingCatalog = null;
 
 function activeChordSnapshot(runtime) {
     if (runtime.activeChordOrder.length === 0) {
@@ -477,33 +475,22 @@ function activeChordSnapshot(runtime) {
     ] || null;
 }
 
-function displayExtensionMask(extensions) {
-    var mask = 0;
-    extensions.forEach(function (extension) {
-        var index = DISPLAY_EXTENSION_ORDER.indexOf(extension);
-        if (index === -1) {
+function seventhLabel(interval) {
+    if (typeof interval !== "number" || interval % 1 !== 0 || interval < 6 || interval > 72) {
+        throw new RangeError("unknown seventh interval in display snapshot");
+    }
+    var conventional = {9: "d7", 10: "m7", 11: "M7"};
+    return conventional[interval] || "7(" + signedInteger(interval) + ")";
+}
+
+function snapshotExtensionLabels(snapshot) {
+    return snapshot.extensions.map(function (extension) {
+        if (DISPLAY_EXTENSION_ORDER.indexOf(extension) === -1) {
             throw new RangeError("unknown chord extension in display snapshot");
         }
-        mask += Math.pow(2, index);
+        return extension === "seventh" ? seventhLabel(snapshot.seventhInterval) :
+            EXTENSION_LABELS[extension];
     });
-    return mask;
-}
-
-function playingDisplayCodeForSnapshot(snapshot) {
-    if (snapshot === null) {
-        return 0;
-    }
-    var qualityIndex = DISPLAY_QUALITY_ORDER.indexOf(snapshot.resolvedQuality);
-    if (qualityIndex === -1) {
-        throw new RangeError("unknown resolved chord quality in display snapshot");
-    }
-    var rootPitchClass = ((snapshot.rootPitch % 12) + 12) % 12;
-    return 1 + rootPitchClass * 80 + qualityIndex * 16 +
-        displayExtensionMask(snapshot.extensions);
-}
-
-function playingDisplayCode(runtime) {
-    return playingDisplayCodeForSnapshot(activeChordSnapshot(runtime));
 }
 
 function playingDisplayLabelForSnapshot(snapshot) {
@@ -511,15 +498,11 @@ function playingDisplayLabelForSnapshot(snapshot) {
         return "--";
     }
     var root = NOTE_NAMES[((snapshot.rootPitch % 12) + 12) % 12];
-    var suffix = DISPLAY_QUALITY_SUFFIXES[snapshot.resolvedQuality];
-    if (suffix === undefined) {
+    var suffix = QUALITY_SUFFIXES[snapshot.resolvedQuality];
+    if (!Object.prototype.hasOwnProperty.call(QUALITY_SUFFIXES, snapshot.resolvedQuality)) {
         throw new RangeError("unknown resolved chord quality in display snapshot");
     }
-    var extensions = DISPLAY_EXTENSION_ORDER.filter(function (extension) {
-        return snapshot.extensions.indexOf(extension) !== -1;
-    }).map(function (extension) {
-        return EXTENSION_LABELS[extension];
-    });
+    var extensions = snapshotExtensionLabels(snapshot);
     return root + suffix + (extensions.length ? " +" + extensions.join("+") : "");
 }
 
@@ -527,27 +510,107 @@ function playingDisplayLabel(runtime) {
     return playingDisplayLabelForSnapshot(activeChordSnapshot(runtime));
 }
 
-function playingDisplayLabels() {
-    var labels = ["--"];
-    var root;
-    var quality;
-    var mask;
-    var extensions;
-    for (root = 0; root < NOTE_NAMES.length; root += 1) {
-        for (quality = 0; quality < DISPLAY_QUALITY_ORDER.length; quality += 1) {
-            for (mask = 0; mask < 16; mask += 1) {
-                extensions = DISPLAY_EXTENSION_ORDER.filter(function (extension, index) {
-                    return (mask & Math.pow(2, index)) !== 0;
-                });
-                labels.push(playingDisplayLabelForSnapshot({
-                    rootPitch: root,
-                    resolvedQuality: DISPLAY_QUALITY_ORDER[quality],
-                    extensions: extensions
-                }));
-            }
+function collectScaleDisplayIntervals(byQuality, scaleMask) {
+    var intervals = [0];
+    var interval;
+    for (interval = 1; interval < 12; interval += 1) {
+        if (scaleMask & Math.pow(2, interval - 1)) {
+            intervals.push(interval);
         }
     }
-    return labels;
+    var musical = runtimeMusicalState.createState({baseOctave: 0, scaleIntervals: intervals});
+    var degree;
+    for (degree = 1; degree <= 8; degree += 1) {
+        var snapshot = runtimeMusicalState.chordSnapshotForPad(musical, 1, degree);
+        var seventh = snapshot.automaticSeventhPitch - snapshot.rootPitch;
+        byQuality[snapshot.resolvedQuality][seventh] = true;
+        // At the upper MIDI boundary a truncated automatic triad resolves to Auto.
+        byQuality.auto[seventh] = true;
+    }
+}
+
+function displaySeventhIntervals() {
+    var byQuality = {};
+    DISPLAY_QUALITY_ORDER.forEach(function (quality) {
+        byQuality[quality] = {};
+        if (quality !== "auto") {
+            var musical = runtimeMusicalState.createState();
+            runtimeMusicalState.setChordType(musical, quality);
+            runtimeMusicalState.setExtension(musical, "seventh", true);
+            var snapshot = runtimeMusicalState.chordSnapshotForPad(musical, 1, 1);
+            byQuality[quality][snapshot.seventhInterval] = true;
+        }
+    });
+    var mask;
+    // Every accepted scale is a subset of pitch classes 1..11 plus tonic 0.
+    for (mask = 0; mask < 2048; mask += 1) {
+        collectScaleDisplayIntervals(byQuality, mask);
+    }
+    return byQuality;
+}
+
+function appendDisplayVariants(catalog, root, quality, seventh) {
+    var mask;
+    for (mask = 0; mask < 8; mask += 1) {
+        if ((mask & 2) && seventh === null) {
+            continue;
+        }
+        var extensions = DISPLAY_EXTENSION_ORDER.filter(function (extension, index) {
+            return (mask & Math.pow(2, index)) !== 0;
+        });
+        var label = playingDisplayLabelForSnapshot({
+            rootPitch: root, resolvedQuality: quality,
+            extensions: extensions, seventhInterval: seventh
+        });
+        if (catalog.codes[label] === undefined) {
+            catalog.codes[label] = catalog.labels.length;
+            catalog.labels.push(label);
+        }
+    }
+}
+
+function appendDisplayQuality(catalog, root, quality, intervals) {
+    appendDisplayVariants(catalog, root, quality, null);
+    Object.keys(intervals).map(Number).sort(function (a, b) { return a - b; })
+        .forEach(function (seventh) {
+            appendDisplayVariants(catalog, root, quality, seventh);
+        });
+}
+
+function appendDisplayRoot(catalog, root, intervalsByQuality) {
+    DISPLAY_QUALITY_ORDER.forEach(function (quality) {
+        appendDisplayQuality(catalog, root, quality, intervalsByQuality[quality]);
+    });
+}
+
+function getPlayingCatalog() {
+    if (playingCatalog !== null) {
+        return playingCatalog;
+    }
+    var catalog = {labels: ["--"], codes: {"--": 0}};
+    var intervalsByQuality = displaySeventhIntervals();
+    NOTE_NAMES.forEach(function (name, root) {
+        appendDisplayRoot(catalog, root, intervalsByQuality);
+    });
+    playingCatalog = catalog;
+    return catalog;
+}
+
+function playingDisplayCodeForSnapshot(snapshot) {
+    var label = playingDisplayLabelForSnapshot(snapshot);
+    var code = getPlayingCatalog().codes[label];
+    if (code === undefined) {
+        throw new RangeError("unsupported chord identity in display snapshot");
+    }
+    return code;
+}
+
+function playingDisplayCode(runtime) {
+    return playingDisplayCodeForSnapshot(activeChordSnapshot(runtime));
+}
+
+function playingDisplayLabels() {
+    return getPlayingCatalog().labels.slice();
 }
 
 function signedInteger(value) {
@@ -565,9 +628,7 @@ function feedbackText(runtime) {
     }
     var root = NOTE_NAMES[snapshot.rootPitch % 12];
     var chordName = root + QUALITY_SUFFIXES[snapshot.resolvedQuality];
-    var extensions = snapshot.extensions.map(function (extension) {
-        return EXTENSION_LABELS[extension];
-    });
+    var extensions = snapshotExtensionLabels(snapshot);
     var inversion = snapshot.voiceLeadingEnabled ?
         "VL " + signedInteger(snapshot.nearestAdjustment) :
         "Voice " + signedInteger(snapshot.manualVoicing);
@@ -581,6 +642,8 @@ function feedbackText(runtime) {
         " | MIDI " + (pitches.length ? pitches.join(" ") : "-");
 }
 
+// Resolve metadata during initialization, never on a physical chord press.
+getPlayingCatalog();
 var maxRuntime = createRuntime();
 
 function emitEvents(events) {

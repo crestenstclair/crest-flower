@@ -4,10 +4,10 @@ VENV_PYTHON := $(VENV)/bin/python
 VENV_PIP := $(VENV)/bin/pip
 ARTIFACT := dist/PushChordGrid.amxd
 MANIFEST := dist/manifest.json
-PACKAGE := dist/PushChordGrid-v0.5.2-RC.zip
+PACKAGE := dist/PushChordGrid-v0.6.0-RC.zip
 ARTIFACT_CHECKSUM := $(ARTIFACT).sha256
 PACKAGE_CHECKSUM := $(PACKAGE).sha256
-LIVE_SET := release/PushChordGrid-v0.5.2-RC Project/PushChordGrid-v0.5.2-RC.als
+LIVE_SET := release/PushChordGrid-v0.6.0-RC Project/PushChordGrid-v0.6.0-RC.als
 
 .PHONY: bootstrap test build validate package clean
 

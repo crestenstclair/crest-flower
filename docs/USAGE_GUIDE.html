@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Interactive usage guide and approved feature direction for Push Chord Grid v0.5.2 RC.">
+  <meta name="description" content="Interactive usage guide and approved feature direction for Push Chord Grid v0.6.0 RC.">
   <title>Push Chord Grid — Usage &amp; Next Features</title>
   <style>
     :root {
@@ -737,7 +737,7 @@
         <p class="lede">Push Chord Grid turns the lower half of Push into four octaves of scale-correct chords. Live owns the key. You choose the degree, voicing, nearest movement, color, and bass.</p>
       </div>
       <aside class="hero-card" aria-label="Current build summary">
-        <div class="version"><strong>0.5.2 RC</strong><span>Live holds + WP5 hardening</span></div>
+        <div class="version"><strong>0.6.0 RC</strong><span>Secret Chords + contextual 7</span></div>
         <div class="facts">
           <div class="fact">32 chord pads</div>
           <div class="fact">4 octaves</div>
@@ -786,28 +786,28 @@
             <div class="matrix-wrap">
               <div class="rank-labels" aria-hidden="true"><span>8</span><span>7</span><span>6</span><span>5</span><span>4</span><span>3</span><span>2</span><span>1</span></div>
               <div class="matrix" aria-label="Interactive Push 8 by 8 grid">
-                <button class="pad pad-quality" data-coordinate="A8" data-role="Dim" data-kind="quality" aria-pressed="false"><span class="pad-main">Dim</span></button>
+                <button class="pad pad-quality" data-coordinate="A8" data-role="Major" data-kind="quality" aria-pressed="false"><span class="pad-main">Maj</span></button>
                 <button class="pad pad-quality" data-coordinate="B8" data-role="Minor" data-kind="quality" aria-pressed="false"><span class="pad-main">Min</span></button>
-                <button class="pad pad-quality" data-coordinate="C8" data-role="Major" data-kind="quality" aria-pressed="false"><span class="pad-main">Maj</span></button>
+                <button class="pad pad-quality" data-coordinate="C8" data-role="Dim" data-kind="quality" aria-pressed="false"><span class="pad-main">Dim</span></button>
                 <button class="pad pad-quality" data-coordinate="D8" data-role="Suspended" data-kind="quality" aria-pressed="false"><span class="pad-main">Sus</span></button>
                 <button class="pad pad-extension" data-coordinate="E8" data-role="Add 6" data-kind="extension" aria-pressed="false"><span class="pad-main">6</span></button>
-                <button class="pad pad-extension" data-coordinate="F8" data-role="Add minor 7" data-kind="extension" aria-pressed="false"><span class="pad-main">m7</span></button>
-                <button class="pad pad-extension" data-coordinate="G8" data-role="Add Major 7" data-kind="extension" aria-pressed="false"><span class="pad-main">M7</span></button>
+                <button class="pad pad-extension" data-coordinate="F8" data-role="Add contextual 7" data-kind="extension" aria-pressed="false"><span class="pad-main">7</span></button>
+                <button class="pad pad-reserved" data-coordinate="G8" data-role="Reserved" data-kind="reserved" aria-pressed="false"><span class="pad-main">—</span></button>
                 <button class="pad pad-extension" data-coordinate="H8" data-role="Add 9" data-kind="extension" aria-pressed="false"><span class="pad-main">9</span></button>
 
-                <button class="pad pad-voice" data-coordinate="A7" data-role="Voice down" data-kind="voice" aria-pressed="false"><span class="pad-main">Voice −</span></button>
-                <button class="pad pad-voice" data-coordinate="B7" data-role="Voice reset" data-kind="voice" aria-pressed="false"><span class="pad-main">Voice 0</span></button>
-                <button class="pad pad-voice" data-coordinate="C7" data-role="Voice up" data-kind="voice" aria-pressed="false"><span class="pad-main">Voice +</span></button>
-                <button class="pad pad-voice" data-coordinate="D7" data-role="Nearest voice leading" data-kind="voiceleading" aria-pressed="false"><span class="pad-main">Nearest</span></button>
+                <button class="pad pad-quality" data-coordinate="A7" data-role="Augmented" data-kind="quality" aria-pressed="false"><span class="pad-main">Aug</span></button>
+                <button class="pad pad-quality" data-coordinate="B7" data-role="Power" data-kind="quality" aria-pressed="false"><span class="pad-main">Power</span></button>
+                <button class="pad pad-quality" data-coordinate="C7" data-role="Quartal" data-kind="quality" aria-pressed="false"><span class="pad-main">Quartal</span></button>
+                <button class="pad pad-quality" data-coordinate="D7" data-role="Dominant" data-kind="quality" aria-pressed="false"><span class="pad-main">Dom</span></button>
                 <button class="pad pad-bass" data-coordinate="E7" data-role="Bass down" data-kind="bass" aria-pressed="false"><span class="pad-main">Bass −</span></button>
                 <button class="pad pad-bass" data-coordinate="F7" data-role="Bass reset" data-kind="bass" aria-pressed="false"><span class="pad-main">Bass −1</span></button>
                 <button class="pad pad-bass" data-coordinate="G7" data-role="Bass up" data-kind="bass" aria-pressed="false"><span class="pad-main">Bass +</span></button>
                 <button class="pad pad-bass" data-coordinate="H7" data-role="Bass toggle" data-kind="bass" aria-pressed="false"><span class="pad-main">Bass</span></button>
 
-                <button class="pad pad-reserved" data-coordinate="A6" data-role="Reserved" data-kind="reserved" aria-pressed="false"><span class="pad-main">—</span></button>
-                <button class="pad pad-reserved" data-coordinate="B6" data-role="Reserved" data-kind="reserved" aria-pressed="false"><span class="pad-main">—</span></button>
-                <button class="pad pad-reserved" data-coordinate="C6" data-role="Reserved" data-kind="reserved" aria-pressed="false"><span class="pad-main">—</span></button>
-                <button class="pad pad-reserved" data-coordinate="D6" data-role="Reserved" data-kind="reserved" aria-pressed="false"><span class="pad-main">—</span></button>
+                <button class="pad pad-voice" data-coordinate="A6" data-role="Voice down" data-kind="voice" aria-pressed="false"><span class="pad-main">Voice −</span></button>
+                <button class="pad pad-voice" data-coordinate="B6" data-role="Voice reset" data-kind="voice" aria-pressed="false"><span class="pad-main">Voice 0</span></button>
+                <button class="pad pad-voice" data-coordinate="C6" data-role="Voice up" data-kind="voice" aria-pressed="false"><span class="pad-main">Voice +</span></button>
+                <button class="pad pad-voice" data-coordinate="D6" data-role="Nearest voice leading" data-kind="voiceleading" aria-pressed="false"><span class="pad-main">Nearest</span></button>
                 <button class="pad pad-reserved" data-coordinate="E6" data-role="Reserved" data-kind="reserved" aria-pressed="false"><span class="pad-main">—</span></button>
                 <button class="pad pad-reserved" data-coordinate="F6" data-role="Reserved" data-kind="reserved" aria-pressed="false"><span class="pad-main">—</span></button>
                 <button class="pad pad-reserved" data-coordinate="G6" data-role="Reserved" data-kind="reserved" aria-pressed="false"><span class="pad-main">—</span></button>
@@ -899,23 +899,23 @@
           <article class="usage-card">
             <span class="mini">QUALITY OVERRIDE</span>
             <h3>Change the type before or during a chord</h3>
-            <p>Dim, Min, Maj, and Sus temporarily replace automatic quality for new and currently held chords. Release returns every hold to that pad’s press-time automatic harmony. The control itself emits no MIDI note.</p>
+            <p>Major, Minor, Dim, Sus, Augmented, Power, Quartal, and Dominant temporarily replace automatic quality for new and currently held chords. Release returns every hold to that pad’s press-time automatic harmony. The control itself emits no MIDI note.</p>
           </article>
           <article class="usage-card">
-            <span class="mini">6 · m7 · M7 · 9</span>
+            <span class="mini">6 · 7 · 9</span>
             <h3>Extensions are additive—and combinable</h3>
-            <p>Hold one or more extension pads before or during a chord. Each adds its own root-relative tone: +9, +10, +11, or +14 semitones, and release removes it from sounding holds.</p>
+            <p>Hold one or more extension pads before or during a chord. 6 adds +9 semitones and 9 adds +14. Contextual 7 follows the press-time scale in Auto; Major/Augmented use +11, Dim +9, and other manual qualities +10. Quartal and Dominant already contain +10, so 7 adds no duplicate note.</p>
             <div class="note-run"><span>C = 60 64 67</span><span>C6 +69</span><span>C7 +70</span><span>CM7 +71</span><span>Cadd9 +74</span></div>
           </article>
           <article class="usage-card">
             <span class="mini">VOICE</span>
-            <h3>Move through inversions without changing the chord</h3>
+            <h3>Move through inversions on A6–C6</h3>
             <p>Voice + repeatedly moves the lowest chord tone up an octave. Voice − moves the highest down. Voice 0 returns future chords to root position.</p>
           </article>
           <article class="usage-card">
-            <span class="mini">NEAREST · D7</span>
+            <span class="mini">NEAREST · D6</span>
             <h3>Let progressions choose their smoothest inversion</h3>
-            <p>Tap D7 to toggle Nearest. The first chord establishes history; later chords choose the closest inversion within one rotation of that pad’s row and Voice baseline. Bass never steers the choice. Changing Voice, Live’s scale, Base Octave, Nearest mode, or lifecycle focus clears history so the next chord starts from a clean baseline.</p>
+            <p>Tap D6 to toggle Nearest. The first chord establishes history; later chords choose the closest inversion within one rotation of that pad’s row and Voice baseline. Bass never steers the choice. Changing Voice, Live’s scale, Base Octave, Nearest mode, or lifecycle focus clears history so the next chord starts from a clean baseline.</p>
           </article>
           <article class="usage-card">
             <span class="mini">BASS</span>
@@ -925,7 +925,7 @@
           <article class="usage-card">
             <span class="mini">LIVE HOLDS</span>
             <h3>Change harmony while it rings</h3>
-            <p>Quality and 6/m7/M7/9 edges always update every held chord atomically, preserving each pad’s strike velocity and never retriggering a retained/shared pitch. Scale, Base Octave, Voice, Nearest, and bass changes still affect future presses only. Focus loss, disable, Reload Grid, deletion, and Set close release every active note plus CC123.</p>
+            <p>Quality and 6/7/9 edges always update every held chord atomically, preserving each pad’s strike velocity and never retriggering a retained/shared pitch. Scale, Base Octave, Voice, Nearest, and bass changes still affect future presses only. Focus loss, disable, Reload Grid, deletion, and Set close release every active note plus CC123.</p>
           </article>
           <article class="usage-card">
             <span class="mini">RECOVERY</span>
@@ -946,7 +946,7 @@
           <article class="usage-card">
             <span class="mini">PUSH SCREEN · PLAYING</span>
             <h3>See the held chord without looking at Live</h3>
-            <p>Push’s first device bank shows Base Octave and Playing, followed by six empty slots. Playing reports the newest held chord’s exact root, resolved quality, and complete 6/m7/M7/9 stack. Release the newest overlap and the previous held chord reappears; release the last chord or lose focus and it returns to --.</p>
+            <p>Push’s first device bank shows Base Octave and Playing, followed by six empty slots. Playing reports the newest held chord’s exact root, resolved quality, and complete 6/7/9 stack. Release the newest overlap and the previous held chord reappears; release the last chord or lose focus and it returns to --.</p>
             <div class="device-readout" aria-label="Example Push parameter bank"><span>Base Octave&nbsp;&nbsp;2</span><span>Playing&nbsp;&nbsp;Cm +m7+9</span></div>
           </article>
         </div>
@@ -958,7 +958,7 @@
       <div class="shell">
         <div class="section-head">
           <div><p class="kicker">Shipped + roadmap</p><h2>More expression.<br>No bloat.</h2></div>
-          <p class="section-intro">v0.5.2 includes always-live holds, the Push Playing display, Nearest voice leading, exact chord feedback, live scale-change detection, and duplicate-safe matrix ownership. The other cards remain proposed or approved directions inspired by Orchid, kept separate from current behavior so you can see exactly what exists today and what may come next.</p>
+          <p class="section-intro">v0.6.0 adds eight qualities and contextual 7 alongside always-live holds, the Push Playing display, Nearest voice leading, exact chord feedback, live scale-change detection, and duplicate-safe matrix ownership. The other cards remain proposed or approved directions inspired by Orchid, kept separate from current behavior so you can see exactly what exists today and what may come next.</p>
         </div>
 
         <div class="chain" aria-label="Recommended Ableton device chain">
@@ -972,9 +972,9 @@
         </div>
 
         <div class="features">
-          <article class="feature"><span class="feature-status">Implemented · 0.4.6</span><h3>Nearest voice leading</h3><p>D7 chooses the deterministic inversion requiring the least movement from the previous chord while preserving row and Voice intent.</p><span class="placement">Control: D7</span></article>
+          <article class="feature"><span class="feature-status">Implemented · 0.4.6</span><h3>Nearest voice leading</h3><p>D6 chooses the deterministic inversion requiring the least movement from the previous chord while preserving row and Voice intent.</p><span class="placement">Control: D6</span></article>
           <article class="feature"><span class="feature-status">Implemented · 0.5.2</span><h3>Live hold behavior</h3><p>Quality and extension changes always apply atomically to every held chord, preserving press context, velocity, and exact shared-note ownership.</p><span class="placement">Always active; no mode setting</span></article>
-          <article class="feature"><span class="feature-status">Approved · P3</span><h3>Secret chord layer</h3><p>A reserved-row layer could expose useful colors beyond Dim/Min/Maj/Sus: augmented, power, quartal, minor-major, dominant, and user-selected formulas.</p><span class="placement">Candidate area: rank 6</span></article>
+          <article class="feature"><span class="feature-status">Implemented · 0.6.0</span><h3>Secret chord layer</h3><p>Augmented (0/4/8), Power (0/7), Quartal (0/5/10), and Dominant (0/4/7/10) share the momentary quality stack with Major, Minor, Dim, and Sus. Power remains a dyad; Dominant already contains its seventh.</p><span class="placement">Controls: A7–D7; Voice/Nearest: A6–D6</span></article>
           <article class="feature"><span class="feature-status">Approved explore</span><h3>Performance snapshots</h3><p>Store and recall a few combinations of voicing, bass register, and extension state. This makes dramatic harmonic changes immediate without turning the grid into a menu.</p><span class="placement">Candidate area: reserved pads</span></article>
           <article class="feature"><span class="feature-status">Approved explore</span><h3>Separate bass output</h3><p>Optionally route the added bass voice separately from the chord voices so each can reach a different Live instrument or MIDI path.</p><span class="placement">Needs Standalone-safe routing design</span></article>
           <article class="feature"><span class="feature-status">Implemented · 0.4.6</span><h3>Clearer chord feedback</h3><p>The device face shows the last chord name, extension stack, inversion, and exact emitted pitch snapshot.</p><span class="placement">Dedicated device line</span></article>
@@ -1001,7 +1001,7 @@
 
   <footer>
     <div class="shell footer-inner">
-      <span>Push Chord Grid v0.5.2 RC · Usage and approved-direction guide · 2026-08-18</span>
+      <span>Push Chord Grid v0.6.0 RC · Usage and approved-direction guide · 2026-10-29</span>
       <span class="footer-links"><a href="ORCHID_ADAPTATION.md">Orchid study</a><a href="HARDWARE_TESTS.md">Hardware card</a><a href="../README.md">Project README</a></span>
     </div>
   </footer>
@@ -1022,7 +1022,7 @@
           behavior: "Silent control · always live on held chords"
         },
         extension: {
-          copy: "Hold this momentary extension, alone or with other extensions, before or during a chord. It adds or removes one root-relative tone on every held chord without retriggering retained pitches.",
+          copy: "Hold this momentary extension, alone or with other extensions, before or during a chord. 6 adds +9 and 9 adds +14; 7 follows the stored scale in Auto or the selected quality. Already-present tones deduplicate. Retained pitches never retrigger.",
           behavior: "Silent control · additive · always live"
         },
         voice: {

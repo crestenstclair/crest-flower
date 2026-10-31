@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Create the deterministic Push Chord Grid v0.5.2 release-candidate bundle."""
+"""Create the deterministic Push Chord Grid v0.6.0 release-candidate bundle."""
 
 from __future__ import annotations
 
@@ -15,12 +15,12 @@ if str(ROOT / "tools") not in sys.path:
 
 from validate_release import validate_release  # noqa: E402
 
-ARCHIVE_ROOT = "PushChordGrid-v0.5.2-RC"
+ARCHIVE_ROOT = "PushChordGrid-v0.6.0-RC"
 DEFAULT_LIVE_SET = (
     ROOT
     / "release"
-    / "PushChordGrid-v0.5.2-RC Project"
-    / "PushChordGrid-v0.5.2-RC.als"
+    / "PushChordGrid-v0.6.0-RC Project"
+    / "PushChordGrid-v0.6.0-RC.als"
 )
 FIXED_ZIP_TIME = (1980, 1, 1, 0, 0, 0)
 
@@ -50,7 +50,7 @@ def package_release(
     validate_release(artifact, manifest, live_set=live_set)
     files = [
         (artifact.name, artifact.read_bytes()),
-        ("PushChordGrid-v0.5.2-RC.als", live_set.read_bytes()),
+        ("PushChordGrid-v0.6.0-RC.als", live_set.read_bytes()),
         ("manifest.json", manifest.read_bytes()),
         ("HARDWARE_TESTS.md", (ROOT / "docs/HARDWARE_TESTS.md").read_bytes()),
         ("ORCHID_ADAPTATION.md", (ROOT / "docs/ORCHID_ADAPTATION.md").read_bytes()),

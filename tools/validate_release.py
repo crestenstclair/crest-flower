@@ -4,9 +4,11 @@
 from __future__ import annotations
 
 import argparse
+import gzip
 import hashlib
 import json
 import sys
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
 
@@ -15,7 +17,9 @@ try:
 except ImportError:  # Direct script execution.
     from inspect_amxd import AmxdValidationError, summary, validate_amxd
 
-PROJECT_VERSION = "0.5.2"
+from tools.runtime_metadata import playing_display_labels
+
+PROJECT_VERSION = "0.6.0"
 BUILD_STAGE = "WP5"
 GENERATOR_NAME = "m4l-builder"
 GENERATOR_VERSION = "0.8.0"
@@ -24,8 +28,8 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_LIVE_SET = (
     ROOT
     / "release"
-    / "PushChordGrid-v0.5.2-RC Project"
-    / "PushChordGrid-v0.5.2-RC.als"
+    / "PushChordGrid-v0.6.0-RC Project"
+    / "PushChordGrid-v0.6.0-RC.als"
 )
 
 
@@ -42,6 +46,7 @@ def expected_manifest(
     live_set: Path = DEFAULT_LIVE_SET,
 ) -> dict[str, Any]:
     document = validate_amxd(artifact)
+    validate_live_set(live_set)
     inspection = summary(document)
     return {
         "schema_version": 1,
@@ -68,6 +73,26 @@ def expected_manifest(
         "runtime_dependencies": inspection["runtime_dependencies"],
         "stored_parameters": inspection["stored_parameters"],
     }
+
+
+def validate_live_set(live_set: Path) -> None:
+    """Reject stale display metadata before packaging an otherwise valid device."""
+    try:
+        root = ET.fromstring(gzip.decompress(live_set.read_bytes()))
+    except (OSError, EOFError, ET.ParseError) as exc:
+        raise AmxdValidationError(f"invalid release Set: {live_set}") from exc
+    parameters = [
+        item for item in root.findall(".//MxDEnumParameter")
+        if item.find("Name") is not None and item.find("Name").get("Value") == "Playing"
+    ]
+    if len(parameters) != 1:
+        raise AmxdValidationError("release Set must contain exactly one Playing parameter")
+    parameter = parameters[0]
+    labels = playing_display_labels()
+    names = [entry.get("Value") for entry in parameter.findall("Names/Name/Name")]
+    maximum = parameter.find("MaxValue")
+    if maximum is None or maximum.get("Value") != str(len(labels) - 1) or names != labels:
+        raise AmxdValidationError("release Set Playing metadata does not match the runtime catalog")
 
 
 def manifest_bytes(manifest: dict[str, Any]) -> bytes:
